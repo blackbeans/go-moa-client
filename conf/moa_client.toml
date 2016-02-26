@@ -1,0 +1,34 @@
+# This is a TOML document.
+
+
+#当前使用的环境
+[env]
+appName="moa-demo"
+appSecretKey="123"
+runMode="online"
+#可以是momokeeper或者zookeeper
+registryType="momokeeper" 
+
+
+#registry的管理	
+[registry]
+	[registry.dev]
+		hosts="localhost:13000,localhost:13000"
+	[registry.online]
+		hosts="vm-bibi-zk-mq001.vm:2181,vm-bibi-zk-mq002.vm:2181,vm-bibi-zk-mq003.vm:2181" 
+
+#cluster的服务器
+[clusters]
+	[clusters.dev]
+		#env=dev/online
+		env="dev" 
+		processTimeout=5
+		#每个机器的连接数量
+		poolSizePerHost = 5
+	[clusters.online]
+		#env=dev/online
+		env="online" 
+		processTimeout=5
+		#每个机器的连接数量
+		poolSizePerHost = 5
+

@@ -12,9 +12,11 @@ type Hello struct {
 }
 
 func TestMakeRpcFunc(t *testing.T) {
-	consumer := NewMoaConsumer([]proxy.Service{proxy.Service{
-		ServiceUri: "/service/lookup",
-		Instance:   &Hello{}}})
+
+	consumer := NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/lookup",
+			Instance:   &Hello{}}})
 	h := consumer.GetService("/service/lookup").(*Hello)
 	a := h.GetService("a", "b")
 	t.Log(a)
