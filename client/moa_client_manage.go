@@ -44,21 +44,23 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 		10*time.Minute, 160000)
 
 	manager := &MoaClientManager{}
-	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
-	manager.addrManager = addrManager
 	//创建连接重连握手回调
-	reconn := client.NewReconnectManager(true, 5*time.Second, 10, func(ga *client.GroupAuth, remoteClient *client.RemotingClient) (bool, error) {
-		//moa中没有握手返回成功
-		return true, nil
-	})
+	reconn := client.NewReconnectManager(true, 5*time.Second, 10,
+		func(ga *client.GroupAuth, remoteClient *client.RemotingClient) (bool, error) {
+			//moa中没有握手返回成功
+			return true, nil
+		})
 	manager.op = op
 	manager.rc = rc
 	manager.clientManager = client.NewClientManager(reconn)
+
+	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
+	manager.addrManager = addrManager
+
 	return manager
 }
 
 func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
-
 	removeHostport := make([]string, 0, 2)
 	//创建连接
 	remoteClients := self.clientManager.FindRemoteClients([]string{uri},
@@ -66,7 +68,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 			exist := false
 			hostport := rc.RemoteAddr()
 			for _, h := range hosts {
-				if h == hostport {
+				if strings.HasPrefix(h, hostport) {
 					exist = true
 					break
 				}
@@ -92,7 +94,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		for _, h := range hosts {
 			exist := false
 			for _, c := range clients {
-				if c.RemoteAddr() == h {
+				if strings.HasPrefix(h, c.RemoteAddr()) {
 					exist = true
 					break
 				}
@@ -104,11 +106,10 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 			}
 		}
 	}
-
 	//新增创建
 	for _, h := range addHostport {
-
-		conn, err := dial(h)
+		split := strings.Split(h, "?")
+		conn, err := dial(split[0])
 		if nil == err {
 
 			//需要开发对应的codec
@@ -120,9 +121,12 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 			//创建连接
 			remoteClient := client.NewRemotingClient(conn, cf, self.readDispatcher, self.rc)
+			remoteClient.Start()
 			auth := client.NewGroupAuth(uri, self.op.AppSecretKey)
 			succ := self.clientManager.Auth(auth, remoteClient)
-			log.InfoLog("moa-server", "MoaClientManager|OnAddressChange|Auth|SUCC|%s|%v", uri, h, succ)
+			log.InfoLog("moa-server", "MoaClientManager|OnAddressChange|Auth|SUCC|%s|%s|%v", uri, h, succ)
+		} else {
+			log.WarnLog("moa-server", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
 		}
 
 	}
@@ -131,14 +135,16 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 //需要开发对应的分包
 func (self MoaClientManager) readDispatcher(remoteClient *client.RemotingClient, p *packet.Packet) {
 	//直接写过去[]byte结构
+	//log.DebugLog("moa-server", "MoaClientManager|readDispatcher|%s", *p)
 	remoteClient.Attach(p.Header.Opaque, p.Data)
 }
 
 //根据Uri获取连接
 func (self MoaClientManager) SelectClient(uri string) (*client.RemotingClient, error) {
-	remoteClients := self.clientManager.FindRemoteClients([]string{uri}, func(groupId string, rc *client.RemotingClient) bool {
-		return false
-	})
+	remoteClients := self.clientManager.FindRemoteClients([]string{uri},
+		func(groupId string, rc *client.RemotingClient) bool {
+			return false
+		})
 
 	clients, ok := remoteClients[uri]
 	if !ok || len(clients) <= 0 {

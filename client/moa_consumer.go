@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"git.wemomo.com/bibi/go-moa-client/option"
 	"git.wemomo.com/bibi/go-moa/protocol"
 	"git.wemomo.com/bibi/go-moa/proxy"
@@ -27,13 +28,16 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 	consumer := &MoaConsumer{}
 	uris := make([]string, 0, 2)
 	for _, s := range ps {
-		consumer.makeRpcFunc(s)
 		services[s.ServiceUri] = s
 		uris = append(uris, s.ServiceUri)
 	}
 	consumer.services = services
 	consumer.options = options
 	consumer.clientManager = NewMoaClientManager(options, uris)
+	//添加代理
+	for _, s := range ps {
+		consumer.makeRpcFunc(s)
+	}
 	return consumer
 }
 
@@ -57,18 +61,21 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 		if t.NumOut() >= 0 {
 			outType = t.Out(0)
 		}
-		v := reflect.MakeFunc(t,
-			func(s proxy.Service, methodName string, outType reflect.Type) func(in []reflect.Value) []reflect.Value {
-				return func(in []reflect.Value) []reflect.Value {
-					//包装RPC使用的参数
-					defer func() {
-						if err := recover(); nil != err {
 
-						}
-					}()
-					return self.rpcInvoke(s, methodName, in, outType)
-				}
-			}(s, name, outType))
+		f := func(s proxy.Service, methodName string,
+			outType reflect.Type) func(in []reflect.Value) []reflect.Value {
+			return func(in []reflect.Value) []reflect.Value {
+				//包装RPC使用的参数
+				defer func() {
+					if err := recover(); nil != err {
+
+					}
+				}()
+				vals := self.rpcInvoke(s, methodName, in, outType)
+				return vals
+			}
+		}(s, name, outType)
+		v := reflect.MakeFunc(t, f)
 		method.Set(v)
 	}
 }
@@ -80,8 +87,9 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	//1.选取服务地址
 	c, err := self.clientManager.SelectClient(s.ServiceUri)
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s", err, s.ServiceUri)
-		return []reflect.Value{reflect.ValueOf("hello")}
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
+			err, s.ServiceUri)
+		panic(err)
 	}
 	//2.组装请求协议
 	cmd := protocol.CommandRequest{}
@@ -96,24 +104,56 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	data, err := json.Marshal(cmd)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s", err, cmd)
-		return []reflect.Value{}
+		panic(err)
 	}
 
-	reqPacket := packet.NewPacket(0, data)
+	reqPacket := packet.NewRespPacket(0, 0, data)
 	//4.等待响应、超时、异常处理
 	result, err := c.WriteAndGet(*reqPacket, self.options.ProcessTimeout)
 	//5.返回调用结果
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s|%s", err, cmd)
-		return []reflect.Value{}
+		panic(err)
 	}
 
-	out := reflect.New(outType).Interface()
-	err = json.Unmarshal(result.([]byte), out)
+	var resp protocol.MoaRespPacket
+	err = json.Unmarshal(result.([]byte), &resp)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|||%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
-		return []reflect.Value{}
+		panic(err)
 	}
-	log.InfoLog("moa_client", "MoaConsumer|rpcInvoke|SUCC|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
-	return []reflect.Value{reflect.ValueOf(out)}
+
+	//执行成功
+	if resp.ErrCode == protocol.CODE_SERVER_SUCC {
+		//log.InfoLog("moa_client", "MoaConsumer|rpcInvoke|SUCC|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
+		if nil != outType {
+			vl := reflect.ValueOf(resp.Result)
+			//类型相等应该就是原则类型了吧、不是数组并且两个类型一样
+			if outType == vl.Type() {
+				return []reflect.Value{vl}
+			} else if vl.Kind() == reflect.Map ||
+				vl.Kind() == reflect.Slice {
+				//可能是对象类型则需要序列化为该对象
+				data, err := json.Marshal(resp.Result)
+				if nil != err {
+					panic(err)
+				} else {
+					inst := reflect.New(outType)
+					uerr := json.Unmarshal(data, inst.Interface())
+					if nil != uerr {
+						panic(uerr)
+					}
+					return []reflect.Value{inst.Elem()}
+				}
+			} else {
+				panic(fmt.Sprintf("UnSupport Return Type %s", outType.String()))
+			}
+		} else {
+			return []reflect.Value{}
+		}
+	} else {
+		//invoke Fail
+		panic(resp.Message)
+	}
+
 }

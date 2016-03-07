@@ -2,7 +2,6 @@ package option
 
 import (
 	"errors"
-	"flag"
 	log "github.com/blackbeans/log4go"
 	"github.com/naoina/toml"
 	"io/ioutil"
@@ -75,14 +74,6 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 		log.ErrorLog("application", "LoadConfiruation|Parse|FAIL|%s", err)
 		return nil, err
 	}
-
-	//若没有使用设置启动模式默认dev
-	runMode := flag.String("runMode", "dev", "-runMode=dev/online")
-	flag.Parse()
-	if nil == runMode || *runMode != "online" {
-		*runMode = "dev"
-	}
-	option.Env.RunMode = *runMode
 
 	cluster, ok := option.Clusters[option.Env.RunMode]
 	if !ok {

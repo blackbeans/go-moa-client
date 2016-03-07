@@ -26,7 +26,7 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 
 	uri2Hosts := make(map[string][]string, 2)
 	center := &AddressManager{serviceUris: uris,
-		registry: registry, uri2Hosts: uri2Hosts}
+		registry: registry, uri2Hosts: uri2Hosts, listener: listener}
 	center.loadAvaiableAddress()
 	go func() {
 		for {
@@ -53,10 +53,19 @@ func (self AddressManager) loadAvaiableAddress() {
 			addrs, err := self.registry.GetService(uri, PROTOCOL_TYPE)
 			if nil != err {
 				log.WarnLog("address_manager", "AddressManager|loadAvaiableAddress|FAIL|%s|%s", err, uri)
+				func() {
+					self.lock.RLock()
+					defer self.lock.RUnlock()
+					oldAddrs, ok := self.uri2Hosts[uri]
+					if ok {
+						hosts[uri] = oldAddrs
+					}
+				}()
 			} else {
 				if len(addrs) > 0 {
 					sort.Strings(addrs)
 					hosts[uri] = addrs
+					log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|GetService|SUCC|%s|%s", uri, addrs)
 				}
 				//对比变化
 				func() {
@@ -68,30 +77,24 @@ func (self AddressManager) loadAvaiableAddress() {
 					}()
 					self.lock.RLock()
 					defer self.lock.RUnlock()
-					needChange := false
+					needChange := true
 					oldAddrs, ok := self.uri2Hosts[uri]
 					if ok {
-
-						if len(oldAddrs) != len(addrs) {
-							needChange = true
-						} else {
+						if len(oldAddrs) > 0 &&
+							len(oldAddrs) == len(addrs) {
 							for j, v := range addrs {
-								if oldAddrs[j] != v {
-									needChange = true
+								//如果是最后一个并且相等那么就应该不需要更新
+								if oldAddrs[j] == v && j == len(addrs)-1 {
+									needChange = false
 									break
 								}
 							}
-						}
-					} else {
-						//旧的里面没有数据，判断新的addrs如果有数据说明新增需要变化
-						if len(oldAddrs) != len(addrs) {
-							needChange = true
+
 						}
 					}
 					//变化通知
 					if needChange {
 						self.listener(uri, addrs)
-						log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|listener|SUCC|%s|%s", uri, addrs)
 					}
 				}()
 
