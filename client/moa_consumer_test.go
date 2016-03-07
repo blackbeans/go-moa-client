@@ -63,8 +63,14 @@ func (self UserServiceDemo) GetName(name string) *DemoResult {
 	return &DemoResult{[]string{"a", "b"}, "/service/user-service"}
 }
 
+type UserServicePanic struct{}
+
+func (self UserServicePanic) GetName(name string) *DemoResult {
+	panic("invoke fail")
+}
+
 func init() {
-	udemo := UserServiceDemo{}
+
 	demo := Demo{make(map[string][]string, 2), "/service/lookup"}
 	inter := reflect.TypeOf((*IHello)(nil)).Elem()
 	uinter := reflect.TypeOf((*IUserService)(nil)).Elem()
@@ -80,12 +86,13 @@ func init() {
 				Interface:  inter},
 			proxy.Service{
 				ServiceUri: "/service/user-service",
-				Instance:   udemo,
+				Instance:   UserServiceDemo{},
+				Interface:  uinter},
+			proxy.Service{
+				ServiceUri: "/service/user-service-panic",
+				Instance:   UserServicePanic{},
 				Interface:  uinter}}
 	})
-
-	// demo.RegisterService("/service/user-service", "localhost:13000",
-	// 	PROTOCOL_TYPE, make(map[string]string, 0))
 
 }
 
@@ -98,11 +105,21 @@ func TestMakeRpcFunc(t *testing.T) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Instance:   &UserService{}}})
+			Instance:   &UserService{}},
+			proxy.Service{
+				ServiceUri: "/service/user-service-panic",
+				Instance:   &UserService{}}})
 	h := consumer.GetService("/service/user-service").(*UserService)
 	a := h.GetName("a")
 	t.Logf("--------Hello,Buddy|%s\n", a)
 	if a.Uri != "/service/user-service" {
+		t.Fail()
+	}
+
+	h = consumer.GetService("/service/user-service-panic").(*UserService)
+	a = h.GetName("a")
+	t.Logf("--------Hello,Buddy|%s\n", a)
+	if nil != a {
 		t.Fail()
 	}
 

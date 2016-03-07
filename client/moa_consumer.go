@@ -2,7 +2,7 @@ package client
 
 import (
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	"git.wemomo.com/bibi/go-moa-client/option"
 	"git.wemomo.com/bibi/go-moa/protocol"
 	"git.wemomo.com/bibi/go-moa/proxy"
@@ -65,12 +65,6 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 		f := func(s proxy.Service, methodName string,
 			outType reflect.Type) func(in []reflect.Value) []reflect.Value {
 			return func(in []reflect.Value) []reflect.Value {
-				//包装RPC使用的参数
-				defer func() {
-					if err := recover(); nil != err {
-
-					}
-				}()
 				vals := self.rpcInvoke(s, methodName, in, outType)
 				return vals
 			}
@@ -84,12 +78,20 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	in []reflect.Value, outType reflect.Type) []reflect.Value {
 
+	//包装RPC使用的参数
+	defer func() {
+		if err := recover(); nil != err {
+
+		}
+	}()
+
 	//1.选取服务地址
 	c, err := self.clientManager.SelectClient(s.ServiceUri)
+	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n",err, s.ServiceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, s.ServiceUri)
-		panic(err)
+		return []reflect.Value{reflect.New(outType).Elem()}
 	}
 	//2.组装请求协议
 	cmd := protocol.CommandRequest{}
@@ -102,25 +104,28 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	cmd.Params.Args = args
 	//3.发送网络请求
 	data, err := json.Marshal(cmd)
+	// fmt.Printf("MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s\n", err, cmd)
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s", err, cmd)
-		panic(err)
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
+		return []reflect.Value{reflect.New(outType).Elem()}
 	}
 
 	reqPacket := packet.NewRespPacket(0, 0, data)
 	//4.等待响应、超时、异常处理
 	result, err := c.WriteAndGet(*reqPacket, self.options.ProcessTimeout)
 	//5.返回调用结果
+	//fmt.Printf("MoaConsumer|rpcInvoke|InvokeFail|%s|%s|%s\n", err, cmd)
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s|%s", err, cmd)
-		panic(err)
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s", err, cmd)
+		return []reflect.Value{reflect.New(outType).Elem()}
 	}
 
 	var resp protocol.MoaRespPacket
 	err = json.Unmarshal(result.([]byte), &resp)
+	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", s.ServiceUri, method, string(result.([]byte)))
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|||%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
-		panic(err)
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
+		return []reflect.Value{reflect.New(outType).Elem()}
 	}
 
 	//执行成功
@@ -136,6 +141,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 				//可能是对象类型则需要序列化为该对象
 				data, err := json.Marshal(resp.Result)
 				if nil != err {
+					log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s", s.ServiceUri, method, resp.Result)
 					panic(err)
 				} else {
 					inst := reflect.New(outType)
@@ -146,14 +152,21 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 					return []reflect.Value{inst.Elem()}
 				}
 			} else {
-				panic(fmt.Sprintf("UnSupport Return Type %s", outType.String()))
+
+				log.ErrorLog("moa_client",
+					"MoaConsumer|rpcInvoke|UnSupport Return Type|%s|%s|%s|%s",
+					s.ServiceUri, method, resp.Result, outType.String())
+				// return []reflect.Value{reflect.New(outType).Elem()}
 			}
 		} else {
-			return []reflect.Value{}
+			return []reflect.Value{reflect.New(outType)}
 		}
 	} else {
 		//invoke Fail
-		panic(resp.Message)
+		log.ErrorLog("moa_client",
+			"MoaConsumer|rpcInvoke|RPC FAIL|%s|%s|%s",
+			s.ServiceUri, method, resp)
+		return []reflect.Value{reflect.New(outType).Elem()}
 	}
-
+	return []reflect.Value{reflect.New(outType).Elem()}
 }
