@@ -22,9 +22,14 @@ type MoaClientManager struct {
 	op            *option.ClientOption
 }
 
+const (
+	REGISTRY_TYPE_MOMOKEEPER = "momokeeper"
+	REGISTRY_TYPE_ZOOKEEPER  = "zookeeper"
+)
+
 func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManager {
 	var reg lb.IRegistry
-	if op.RegistryType == "momokeeper" {
+	if op.RegistryType == REGISTRY_TYPE_MOMOKEEPER {
 		split := strings.Split(op.RegistryHosts, ",")
 		if len(split) > 1 {
 			reg = lb.NewMomokeeper(split[0], split[1])
@@ -32,8 +37,13 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 			reg = lb.NewMomokeeper(split[0], split[0])
 		}
 
-	} else if op.RegistryType == "zookeeper" {
-
+	} else if op.RegistryType == REGISTRY_TYPE_ZOOKEEPER {
+		split := strings.Split(op.RegistryHosts, ",")
+		if len(split) > 1 {
+			reg = lb.NewZookeeper(split[0], split[1])
+		} else {
+			reg = lb.NewZookeeper(split[0], split[0])
+		}
 	}
 
 	//网络参数
