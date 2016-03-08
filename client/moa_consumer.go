@@ -65,7 +65,7 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 			for idx := 0; idx < t.NumOut(); idx++ {
 				outType = append(outType, t.Out(idx))
 			}
-			if outType[len(outType)-1].String() != "error" {
+			if !outType[len(outType)-1].Implements(errorType) {
 				panic(errors.New(
 					fmt.Sprintf("%s Method  %s Last Return Type Must Be An Error! [%s]",
 						s.ServiceUri, name, outType[len(outType)-1].String())))
@@ -96,7 +96,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	errFunc := func(err *error) []reflect.Value {
 		retVal := make([]reflect.Value, 0, len(outType))
 		for _, t := range outType {
-			if t.String() == "error" {
+			if t.Implements(errorType) {
 				retVal = append(retVal, reflect.ValueOf(err).Elem())
 			} else {
 				retVal = append(retVal, reflect.New(t).Elem())
@@ -153,7 +153,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	//获取非Error的返回类型
 	var resultType reflect.Type
 	for _, t := range outType {
-		if t.String() != "error" {
+		if !t.Implements(errorType) {
 			resultType = t
 		}
 	}
