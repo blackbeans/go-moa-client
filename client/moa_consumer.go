@@ -2,7 +2,8 @@ package client
 
 import (
 	"encoding/json"
-	// "fmt"
+	"errors"
+	"fmt"
 	"git.wemomo.com/bibi/go-moa-client/option"
 	"git.wemomo.com/bibi/go-moa/protocol"
 	"git.wemomo.com/bibi/go-moa/proxy"
@@ -41,6 +42,10 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 	return consumer
 }
 
+func (self MoaConsumer) Destory() {
+	self.clientManager.Destory()
+}
+
 func (self MoaConsumer) GetService(uri string) interface{} {
 	return self.services[uri].Instance
 }
@@ -52,18 +57,26 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 	htype := reflect.TypeOf(obj.Interface())
 	for i := 0; i < numf; i++ {
 		method := obj.Field(i)
-
 		name := htype.Field(i).Name
 		t := method.Type()
-
-		var outType reflect.Type
-		//返回值
-		if t.NumOut() >= 0 {
-			outType = t.Out(0)
+		outType := make([]reflect.Type, 0, 2)
+		//返回值必须大于等于1个并且小于2，并且其中一个必须为error类型
+		if t.NumOut() >= 1 && t.NumOut() <= 2 {
+			for idx := 0; idx < t.NumOut(); idx++ {
+				outType = append(outType, t.Out(idx))
+			}
+			if outType[len(outType)-1].String() != "error" {
+				panic(errors.New(
+					fmt.Sprintf("%s Method  %s Last Return Type Must Be An Error! [%s]",
+						s.ServiceUri, name, outType[len(outType)-1].String())))
+			}
+		} else {
+			panic(errors.New(
+				fmt.Sprintf("%s Method  %s Last Return Type Must Be More Than An Error!", s.ServiceUri, name)))
 		}
 
 		f := func(s proxy.Service, methodName string,
-			outType reflect.Type) func(in []reflect.Value) []reflect.Value {
+			outType []reflect.Type) func(in []reflect.Value) []reflect.Value {
 			return func(in []reflect.Value) []reflect.Value {
 				vals := self.rpcInvoke(s, methodName, in, outType)
 				return vals
@@ -74,24 +87,33 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 	}
 }
 
+var errorType = reflect.TypeOf(make([]error, 1)).Elem()
+
 //真正发起RPC调用的逻辑
 func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
-	in []reflect.Value, outType reflect.Type) []reflect.Value {
+	in []reflect.Value, outType []reflect.Type) []reflect.Value {
 
-	//包装RPC使用的参数
-	defer func() {
-		if err := recover(); nil != err {
-
+	errFunc := func(err *error) []reflect.Value {
+		retVal := make([]reflect.Value, 0, len(outType))
+		for _, t := range outType {
+			if t.String() == "error" {
+				retVal = append(retVal, reflect.ValueOf(err).Elem())
+			} else {
+				retVal = append(retVal, reflect.New(t).Elem())
+			}
 		}
-	}()
+
+		return retVal
+	}
 
 	//1.选取服务地址
 	c, err := self.clientManager.SelectClient(s.ServiceUri)
-	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n",err, s.ServiceUri)
+	//fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, s.ServiceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, s.ServiceUri)
-		return []reflect.Value{reflect.New(outType).Elem()}
+		return errFunc(&err)
+
 	}
 	//2.组装请求协议
 	cmd := protocol.CommandRequest{}
@@ -104,10 +126,10 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	cmd.Params.Args = args
 	//3.发送网络请求
 	data, err := json.Marshal(cmd)
-	// fmt.Printf("MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s\n", err, cmd)
+	//fmt.Printf("MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s\n", err, cmd)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
-		return []reflect.Value{reflect.New(outType).Elem()}
+		return errFunc(&err)
 	}
 
 	reqPacket := packet.NewRespPacket(0, 0, data)
@@ -117,7 +139,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	//fmt.Printf("MoaConsumer|rpcInvoke|InvokeFail|%s|%s|%s\n", err, cmd)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s", err, cmd)
-		return []reflect.Value{reflect.New(outType).Elem()}
+		return errFunc(&err)
 	}
 
 	var resp protocol.MoaRespPacket
@@ -125,48 +147,61 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", s.ServiceUri, method, string(result.([]byte)))
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
-		return []reflect.Value{reflect.New(outType).Elem()}
+		return errFunc(&err)
+	}
+
+	//获取非Error的返回类型
+	var resultType reflect.Type
+	for _, t := range outType {
+		if t.String() != "error" {
+			resultType = t
+		}
 	}
 
 	//执行成功
 	if resp.ErrCode == protocol.CODE_SERVER_SUCC {
-		//log.InfoLog("moa_client", "MoaConsumer|rpcInvoke|SUCC|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
-		if nil != outType {
+		if nil != resultType {
 			vl := reflect.ValueOf(resp.Result)
 			//类型相等应该就是原则类型了吧、不是数组并且两个类型一样
-			if outType == vl.Type() {
-				return []reflect.Value{vl}
+			if resultType == vl.Type() {
+				return []reflect.Value{vl, reflect.Zero(errorType)}
 			} else if vl.Kind() == reflect.Map ||
 				vl.Kind() == reflect.Slice {
 				//可能是对象类型则需要序列化为该对象
 				data, err := json.Marshal(resp.Result)
 				if nil != err {
 					log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s", s.ServiceUri, method, resp.Result)
-					panic(err)
+					return errFunc(&err)
 				} else {
-					inst := reflect.New(outType)
-					uerr := json.Unmarshal(data, inst.Interface())
-					if nil != uerr {
-						panic(uerr)
+					inst := reflect.New(resultType)
+
+					if len(data) > 0 {
+						uerr := json.Unmarshal(data, inst.Interface())
+						if nil != uerr {
+							return errFunc(&uerr)
+						}
 					}
-					return []reflect.Value{inst.Elem()}
+					return []reflect.Value{inst.Elem(), reflect.Zero(errorType)}
 				}
 			} else {
 
 				log.ErrorLog("moa_client",
 					"MoaConsumer|rpcInvoke|UnSupport Return Type|%s|%s|%s|%s",
-					s.ServiceUri, method, resp.Result, outType.String())
-				// return []reflect.Value{reflect.New(outType).Elem()}
+					s.ServiceUri, method, resp.Result, resultType.String())
+				err = errors.New(fmt.Sprintf("UnSupport Return Type|%s|%s|%s|%s",
+					resp.Result, resultType.String()))
+				return errFunc(&err)
 			}
 		} else {
-			return []reflect.Value{reflect.New(outType)}
+			//只有error的情况,没有错误返回成功
+			return []reflect.Value{reflect.Zero(errorType)}
 		}
 	} else {
 		//invoke Fail
 		log.ErrorLog("moa_client",
 			"MoaConsumer|rpcInvoke|RPC FAIL|%s|%s|%s",
 			s.ServiceUri, method, resp)
-		return []reflect.Value{reflect.New(outType).Elem()}
+		err = errors.New(resp.Message)
+		return errFunc(&err)
 	}
-	return []reflect.Value{reflect.New(outType).Elem()}
 }
