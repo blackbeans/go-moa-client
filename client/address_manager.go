@@ -1,7 +1,9 @@
 package client
 
 import (
+	"bytes"
 	"git.wemomo.com/bibi/go-moa/lb"
+	"github.com/blackbeans/go-zookeeper/zk"
 	log "github.com/blackbeans/log4go"
 	"reflect"
 	"sort"
@@ -36,7 +38,7 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 	center := &AddressManager{serviceUris: uris,
 		registry: registry, uri2Hosts: uri2Hosts, listener: listener}
 	center.loadAvaiableAddress()
-	registryType = reflect.TypeOf(registry).String()
+	registryType := reflect.TypeOf(registry).String()
 
 	if strings.Contains(registryType, REGISTRY_TYPE_MOMOKEEPER) {
 		// momokeeper 需要定时轮训
@@ -56,20 +58,20 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 		}()
 	} else if strings.Contains(registryType, REGISTRY_TYPE_ZOOKEEPER) {
 		// zookeeper 坐等服务端通知即可
-		for _, uri := range uris {
-			regZk, _ := registry.(lb.zookeeper)
-			conn := regZk.regCon
-			path := concat(ZK_MOA_ROOT_PATH, concat(uri, "_", PROTOCOL_TYPE))
-			func() {
-				defer func() {
-					if err := recover(); nil != err {
+		// for _, uri := range uris {
+		// 	regZk, _ := registry.(lb.zookeeper)
+		// 	conn := regZk.GetRegConn()
+		// 	path := concat(ZK_MOA_ROOT_PATH, concat(uri, "_", PROTOCOL_TYPE))
+		// 	func() {
+		// 		defer func() {
+		// 			if err := recover(); nil != err {
 
-					}
-				}()
-				//需要定时拉取服务地址
-				center.listenZkNodeChanged(conn, path)
-			}()
-		}
+		// 			}
+		// 		}()
+		// 		//需要定时拉取服务地址
+		// 		center.listenZkNodeChanged(conn, path)
+		// 	}()
+		// }
 	} else {
 		log.ErrorLog("address_manager", "AddressManager|can't support this registryType|%s", registryType)
 	}
@@ -77,7 +79,7 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 	return center
 }
 
-func (self AddressManager) listenZkNodeChanged(conn zk.Conn, path, uri string) error {
+func (self AddressManager) listenZkNodeChanged(conn *zk.Conn, path, uri string) error {
 	snapshots, errors := mirror(conn, path)
 	go func() {
 		for {
