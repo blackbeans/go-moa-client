@@ -4,15 +4,14 @@ import (
 	"git.wemomo.com/bibi/go-moa/proxy"
 	// "runtime"
 	"git.wemomo.com/bibi/go-moa/core"
-	"reflect"
 	"testing"
 )
 
 func init() {
 
 	demo := Demo{make(map[string][]string, 2), "/service/lookup"}
-	inter := reflect.TypeOf((*IHello)(nil)).Elem()
-	uinter := reflect.TypeOf((*IUserService)(nil)).Elem()
+	inter := (*IHello)(nil)
+	uinter := (*IUserService)(nil)
 	core.NewApplcation("../conf/moa_server.toml", func() []proxy.Service {
 		return []proxy.Service{
 			proxy.Service{
