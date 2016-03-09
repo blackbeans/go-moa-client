@@ -2,6 +2,7 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"git.wemomo.com/bibi/go-moa-client/option"
 	"git.wemomo.com/bibi/go-moa/lb"
 	log "github.com/blackbeans/log4go"
@@ -12,14 +13,17 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 type MoaClientManager struct {
 	clientManager *client.ClientManager
+	clientPool    map[string]chan bool //redis连接不能被多线程复用，必须占位
 	addrManager   *AddressManager
 	rc            *turbo.RemotingConfig
 	op            *option.ClientOption
+	lock          sync.RWMutex
 }
 
 const (
@@ -50,6 +54,7 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 		10*time.Minute, 160000)
 
 	manager := &MoaClientManager{}
+	manager.clientPool = make(map[string]chan bool, 100)
 	//创建连接重连握手回调
 	reconn := client.NewReconnectManager(true, 5*time.Second, 10,
 		func(ga *client.GroupAuth, remoteClient *client.RemotingClient) (bool, error) {
@@ -125,17 +130,40 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 				return decoder
 			}
 
-			//创建连接
-			remoteClient := client.NewRemotingClient(conn, cf, self.readDispatcher, self.rc)
-			remoteClient.Start()
-			auth := client.NewGroupAuth(uri, self.op.AppSecretKey)
-			succ := self.clientManager.Auth(auth, remoteClient)
-			log.InfoLog("moa-server", "MoaClientManager|OnAddressChange|Auth|SUCC|%s|%s|%v", uri, h, succ)
+			//创建一下连接数
+			for i := 0; i < self.op.PoolSizePerHost; i++ {
+				//创建连接
+				remoteClient := client.NewRemotingClient(conn, cf, self.readDispatcher, self.rc)
+				remoteClient.Start()
+				auth := client.NewGroupAuth(uri, self.op.AppSecretKey)
+				succ := self.clientManager.Auth(auth, remoteClient)
+				if succ {
+					func() {
+						self.lock.Lock()
+						defer self.lock.Unlock()
+						ch := make(chan bool, 1)
+						ch <- true
+						self.clientPool[remoteClient.LocalAddr()] = ch
+
+					}()
+				}
+				log.InfoLog("moa-server", "MoaClientManager|OnAddressChange|Auth|SUCC|%s[%d]|%s|%v", uri, i, h, succ)
+			}
 		} else {
 			log.WarnLog("moa-server", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
 		}
 
 	}
+	//删除需要删除的客户端
+	self.clientManager.DeleteClients(removeHostport...)
+	func() {
+
+		self.lock.Lock()
+		defer self.lock.Unlock()
+		for _, h := range removeHostport {
+			delete(self.clientPool, h)
+		}
+	}()
 }
 
 //需要开发对应的分包
@@ -143,6 +171,9 @@ func (self MoaClientManager) readDispatcher(remoteClient *client.RemotingClient,
 	//直接写过去[]byte结构
 	//log.DebugLog("moa-server", "MoaClientManager|readDispatcher|%s", *p)
 	remoteClient.Attach(p.Header.Opaque, p.Data)
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	self.clientPool[remoteClient.LocalAddr()] <- true
 }
 
 //根据Uri获取连接
@@ -156,8 +187,22 @@ func (self MoaClientManager) SelectClient(uri string) (*client.RemotingClient, e
 	if !ok || len(clients) <= 0 {
 		return nil, errors.New("NO Client for [" + uri + "]")
 	} else {
-		return clients[rand.Intn(len(clients))], nil
+		c := clients[rand.Intn(len(clients))]
+		self.lock.RLock()
+		defer self.lock.RUnlock()
+		select {
+		case <-self.clientPool[c.LocalAddr()]:
+			return c, nil
+		case <-time.After(self.op.ProcessTimeout):
+			return nil, errors.New(fmt.Sprintf("SelectClient Timeout %s", uri))
+		}
+
 	}
+
+}
+
+func (self MoaClientManager) Destory() {
+	self.clientManager.Shutdown()
 }
 
 //创建物理连接
