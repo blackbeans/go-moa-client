@@ -42,8 +42,7 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 		}
 
 	} else if op.RegistryType == REGISTRY_TYPE_ZOOKEEPER {
-		split := strings.Split(op.RegistryHosts, ",")
-		reg = lb.NewZookeeper(split[0])
+		reg = lb.NewZookeeper(op.RegistryHosts, uris)
 	}
 
 	//网络参数
