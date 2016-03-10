@@ -21,6 +21,7 @@ registryType="momokeeper"
 	[clusters.dev]
 		#env=dev/online
 		env="dev" 
+		logFile="../conf/log_test.xml"
 		processTimeout=5
 		#最大分发处理协程数
 		maxDispatcherSize=8000 
@@ -32,10 +33,12 @@ registryType="momokeeper"
 		writeChannelSize=1000 
 		#读异步channel长度
 		readChannelSize=1000 
+
 		
 	[clusters.online]
 		#env=dev/online
 		env="online" 
+		logFile="../conf/log_test.xml"
 		processTimeout=5
 		#最大分发处理协程数
 		maxDispatcherSize=8000 

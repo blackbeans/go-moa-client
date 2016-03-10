@@ -4,15 +4,14 @@ import (
 	"git.wemomo.com/bibi/go-moa/proxy"
 	// "runtime"
 	"git.wemomo.com/bibi/go-moa/core"
-	"reflect"
 	"testing"
 )
 
 func init() {
 
 	demo := Demo{make(map[string][]string, 2), "/service/lookup"}
-	inter := reflect.TypeOf((*IHello)(nil)).Elem()
-	uinter := reflect.TypeOf((*IUserService)(nil)).Elem()
+	inter := (*IHello)(nil)
+	uinter := (*IUserService)(nil)
 	core.NewApplcation("../conf/moa_server.toml", func() []proxy.Service {
 		return []proxy.Service{
 			proxy.Service{
@@ -40,10 +39,10 @@ func TestMakeRpcFunc(t *testing.T) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Instance:   &UserService{}},
+			Interface:  &UserService{}},
 			proxy.Service{
 				ServiceUri: "/service/user-service-panic",
-				Instance:   &UserService{}}})
+				Interface:  &UserService{}}})
 	h := consumer.GetService("/service/user-service").(*UserService)
 	a, err := h.GetName("a")
 	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
@@ -81,7 +80,7 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Instance:   &UserService{}}})
+			Interface:  &UserService{}}})
 	b.StartTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -100,7 +99,7 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Instance:   &UserService{}}})
+			Interface:  &UserService{}}})
 	for i := 0; i < b.N; i++ {
 		h := consumer.GetService("/service/user-service").(*UserService)
 		a, _ := h.GetName("a")

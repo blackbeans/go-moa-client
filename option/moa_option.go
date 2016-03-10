@@ -34,6 +34,7 @@ type Cluster struct {
 	Env             string //当前环境使用的是dev还是online
 	ProcessTimeout  int    //处理超时 5 s单位
 	PoolSizePerHost int    //5
+	LogFile         string //log4go的文件路径
 }
 
 //---------最终需要的ClientCOption
@@ -61,7 +62,6 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 	var option Option
 	err = toml.Unmarshal(buff, &option)
 	if nil != err {
-		log.ErrorLog("application", "LoadConfiruation|Parse|FAIL|%s", err)
 		return nil, err
 	}
 
@@ -69,6 +69,9 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 	if !ok {
 		return nil, errors.New("no cluster config for " + option.Env.RunMode)
 	}
+
+	//加载log4go
+	log.LoadConfiguration(cluster.LogFile)
 
 	reg, exist := option.Registry[option.Env.RunMode]
 	if !exist {
