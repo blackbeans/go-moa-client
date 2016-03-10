@@ -10,6 +10,7 @@ import (
 	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo/packet"
 	"reflect"
+	"strings"
 )
 
 type MoaConsumer struct {
@@ -57,7 +58,9 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 	htype := reflect.TypeOf(obj.Interface())
 	for i := 0; i < numf; i++ {
 		method := obj.Field(i)
-		name := htype.Field(i).Name
+		//fuck 统一约定方法首字母小写
+		name := strings.ToLower(string(htype.Field(i).Name[0]))
+		+htype.Field(i).Name[1:]
 		t := method.Type()
 		outType := make([]reflect.Type, 0, 2)
 		//返回值必须大于等于1个并且小于2，并且其中一个必须为error类型
