@@ -3,8 +3,9 @@
 * 安装：
     - 因为使用了私有仓库因此必须使用 —insecure参数
     ``` 
-    go get -insecure  git.wemomo.com/bibi/go-moa-client/client
-    go get -insecure  git.wemomo.com/bibi/go-moa/proxy"
+    go get -insecure git.wemomo.com/bibi/go-moa-client/client
+    go get -insecure git.wemomo.com/bibi/go-moa/proxy
+    
     ```
 
 * 定义服务的接口对应的struct
