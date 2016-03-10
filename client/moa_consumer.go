@@ -47,11 +47,11 @@ func (self MoaConsumer) Destory() {
 }
 
 func (self MoaConsumer) GetService(uri string) interface{} {
-	return self.services[uri].Instance
+	return self.services[uri].Interface
 }
 
 func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
-	elem := reflect.ValueOf(s.Instance)
+	elem := reflect.ValueOf(s.Interface)
 	obj := elem.Elem()
 	numf := obj.NumField()
 	htype := reflect.TypeOf(obj.Interface())

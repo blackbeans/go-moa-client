@@ -25,10 +25,12 @@ registryType="momokeeper"
 		processTimeout=5
 		#每个机器的连接数量
 		poolSizePerHost = 5
+		logFile=./log/log4go_dev.xml
 	[clusters.online]
 		#env=dev/online
 		env="online" 
 		processTimeout=5
 		#每个机器的连接数量
 		poolSizePerHost = 5
+		logFile=./log/log4go_online.xml
 
