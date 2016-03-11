@@ -5,6 +5,7 @@ import (
 	// "runtime"
 	"git.wemomo.com/bibi/go-moa/core"
 	"testing"
+	"time"
 )
 
 func init() {
@@ -35,6 +36,9 @@ func init() {
 }
 
 func TestMakeRpcFunc(t *testing.T) {
+
+	//等待5s注册地址
+	time.Sleep(5 * time.Second)
 
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
