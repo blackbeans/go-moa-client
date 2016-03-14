@@ -33,6 +33,17 @@
     <property name="maxlines">10M</property> <!-- \d+[KMG]? Suffixes are in terms of thousands -->
     <property name="daily">true</property> <!-- Automatically rotates when a log message is written after midnight -->
   </filter>
+  <filter enabled="true">
+    <tag>moa-stat</tag>
+    <type>file</type>
+    <level>INFO</level>
+    <property name="filename">./logs/moa-stat.log</property>
+    <property name="format">[%D %T] %M</property>
+    <property name="rotate">true</property> <!-- true enables log rotation, otherwise append -->
+    <property name="maxsize">100M</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
+    <property name="maxlines">10M</property> <!-- \d+[KMG]? Suffixes are in terms of thousands -->
+    <property name="daily">true</property> <!-- Automatically rotates when a log message is written after midnight -->
+  </filter>
    <filter enabled="true">
     <tag>debug</tag>
     <type>file</type>
