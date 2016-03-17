@@ -77,6 +77,9 @@ func TestMakeRpcFunc(t *testing.T) {
 	//---------no return
 	h.SetName("a")
 
+	// 暂停一下，不然moa-stat统计打印不出来
+	time.Sleep(time.Second * 2)
+
 }
 
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
