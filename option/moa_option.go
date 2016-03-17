@@ -16,11 +16,12 @@ type HostPort struct {
 //配置信息
 type Option struct {
 	Env struct {
-		RunMode      string
-		BindAddress  string
-		RegistryType string
-		AppName      string
-		AppSecretKey string
+		RunMode          string
+		BindAddress      string
+		RegistryType     string
+		AppName          string
+		AppSecretKey     string
+		ServiceUriSuffix string
 	}
 
 	//使用的环境
@@ -39,12 +40,13 @@ type Cluster struct {
 
 //---------最终需要的ClientCOption
 type ClientOption struct {
-	AppName         string
-	AppSecretKey    string
-	RegistryType    string
-	RegistryHosts   string
-	ProcessTimeout  time.Duration
-	PoolSizePerHost int
+	AppName          string
+	AppSecretKey     string
+	RegistryType     string
+	RegistryHosts    string
+	ProcessTimeout   time.Duration
+	PoolSizePerHost  int
+	ServiceUriSuffix string
 }
 
 func LoadConfiruation(path string) (*ClientOption, error) {
@@ -80,6 +82,7 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 
 	//拼装为可用的MOA参数
 	mop := &ClientOption{}
+	mop.ServiceUriSuffix = option.Env.ServiceUriSuffix
 	mop.AppName = option.Env.AppName
 	mop.AppSecretKey = option.Env.AppSecretKey
 	mop.RegistryType = option.Env.RegistryType

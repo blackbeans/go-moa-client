@@ -8,6 +8,8 @@ appSecretKey="123"
 runMode="dev"
 #可以是momokeeper或者zookeeper
 registryType="zookeeper" 
+#service Uri的后缀可以为空
+serviceUriSuffix=""
 
 
 #registry的管理	

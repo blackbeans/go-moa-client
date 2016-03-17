@@ -30,8 +30,10 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 	consumer := &MoaConsumer{}
 	uris := make([]string, 0, 2)
 	for _, s := range ps {
-		services[s.ServiceUri] = s
-		uris = append(uris, s.ServiceUri)
+		uri := s.ServiceUri + options.ServiceUriSuffix
+		s.ServiceUri = uri
+		services[uri] = s
+		uris = append(uris, uri)
 	}
 	consumer.services = services
 	consumer.options = options

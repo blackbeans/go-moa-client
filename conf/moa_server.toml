@@ -7,7 +7,9 @@ name="moa-demo"
 runMode="dev"
 bindAddress="^10\\.83\\.\\d+\\.\\d+$:13000"
 #可以是momokeeper或者zookeeper
-registryType="zookeeper" 
+registryType="zookeeper"
+#service Uri的后缀可以为空
+serviceUriSuffix="" 
 
 #registry的管理	
 [registry]
