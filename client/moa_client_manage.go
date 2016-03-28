@@ -3,8 +3,8 @@ package client
 import (
 	"errors"
 	"fmt"
-	"git.wemomo.com/bibi/go-moa-client/option"
-	"git.wemomo.com/bibi/go-moa/lb"
+	"github.com/blackbeans/go-moa-client/option"
+	"github.com/blackbeans/go-moa/lb"
 	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo"
 	"github.com/blackbeans/turbo/client"

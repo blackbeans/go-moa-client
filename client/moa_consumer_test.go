@@ -1,9 +1,9 @@
 package client
 
 import (
-	"git.wemomo.com/bibi/go-moa/proxy"
+	"github.com/blackbeans/go-moa/proxy"
 	// "runtime"
-	"git.wemomo.com/bibi/go-moa/core"
+	"github.com/blackbeans/go-moa/core"
 	"testing"
 	"time"
 )

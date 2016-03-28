@@ -5,13 +5,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"git.wemomo.com/bibi/go-moa/protocol"
+	"github.com/blackbeans/go-moa/protocol"
 	"github.com/blackbeans/turbo/packet"
 	"strconv"
 )
 
 const (
 	GET_PREFIX = "*2\r\n$3\r\nGET\r\n"
+	GET        = 0
+	PING       = 0
 )
 
 type MoaClientCodeC struct {

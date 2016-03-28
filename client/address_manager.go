@@ -1,7 +1,7 @@
 package client
 
 import (
-	"git.wemomo.com/bibi/go-moa/lb"
+	"github.com/blackbeans/go-moa/lb"
 	log "github.com/blackbeans/log4go"
 	"sort"
 	"sync"

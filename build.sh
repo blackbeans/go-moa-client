@@ -3,9 +3,9 @@ go get github.com/blackbeans/turbo
 go get github.com/blackbeans/log4go
 go get gopkg.in/redis.v3 
 
-go get git.wemomo.com/bibi/go-moa/lb
-go get git.wemomo.com/bibi/go-moa/proxy
-go get git.wemomo.com/bibi/go-moa/protocol
+go get github.com/blackbeans/go-moa/lb
+go get github.com/blackbeans/go-moa/proxy
+go get github.com/blackbeans/go-moa/protocol
 
 
 
