@@ -136,8 +136,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
 		return errFunc(&err)
 	}
-
-	reqPacket := packet.NewRespPacket(0, 0, data)
+	reqPacket := packet.NewRespPacket(0, CMD_GET, data)
 	//4.等待响应、超时、异常处理
 	result, err := c.WriteAndGet(*reqPacket, self.options.ProcessTimeout)
 	//5.返回调用结果

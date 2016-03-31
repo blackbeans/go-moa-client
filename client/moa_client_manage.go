@@ -10,6 +10,7 @@ import (
 	"github.com/blackbeans/turbo/client"
 	"github.com/blackbeans/turbo/codec"
 	"github.com/blackbeans/turbo/packet"
+	"math"
 	"math/rand"
 	"net"
 	"strings"
@@ -50,7 +51,7 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 		op.AppName,
 		op.PoolSizePerHost, 16*1024,
 		16*1024, 10000, 10000,
-		10*time.Minute, 160000)
+		1*time.Minute, 10)
 
 	manager := &MoaClientManager{}
 	manager.clientPool = make(map[string]chan bool, 100)
@@ -67,7 +68,69 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
 
+	//开启服务PING PONG
+	go func() {
+		for {
+			time.Sleep(op.ProcessTimeout * 2)
+			wg := sync.WaitGroup{}
+			clone := manager.clientManager.ClientsClone()
+			wg.Add(len(clone))
+			for _, c := range clone {
+				go func() {
+					defer wg.Done()
+					manager.ping(c)
+				}()
+			}
+			//等待本次的所有的PING—PONG结束
+			wg.Wait()
+		}
+	}()
 	return manager
+}
+
+func (self MoaClientManager) ping(c *client.RemotingClient) bool {
+	succ := false
+	//发起PING请求
+	for i := 0; i < 2; i++ {
+		if c.Idle() && !c.IsClosed() {
+			func() {
+				self.lock.RLock()
+				defer self.lock.RUnlock()
+				select {
+				case <-self.clientPool[c.LocalAddr()]:
+				case <-time.After(self.op.ProcessTimeout * 2):
+					//如果超时还没得到连接可用则放弃本次PING，因为连接正忙
+					succ = true
+					return
+				}
+				//发送PING协议
+				heartbeat := packet.NewRespPacket(0, CMD_PING, PING)
+				err := c.Ping(heartbeat, self.op.ProcessTimeout)
+				if nil != err {
+					//需要关闭连接，然后重连任务会启动重连
+					if i == 1 {
+						c.Shutdown()
+						log.WarnLog("address_manager",
+							"MoaClientManager|checkConnStatus|Ping|FAIL|%s|%s", c.LocalAddr(), err)
+						succ = false
+						return
+					} else {
+						//第一次超时等待第二次PING
+						delay := time.Duration(int64(math.Pow(2, float64(i+1))) * int64(self.op.ProcessTimeout))
+						time.Sleep(delay)
+					}
+				} else {
+					succ = true
+					log.InfoLog("address_manager",
+						"MoaClientManager|checkConnStatus|Ping|SUCC|%s...", c.LocalAddr())
+					return
+				}
+			}()
+		}
+	}
+
+	return succ
+
 }
 
 func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
@@ -77,6 +140,10 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		func(groupId string, rc *client.RemotingClient) bool {
 			exist := false
 			hostport := rc.RemoteAddr()
+			addr, _ := net.ResolveTCPAddr("tcp4", hostport)
+			if addr.IP.To4().IsLoopback() {
+				hostport = fmt.Sprintf("0.0.0.0:%d", addr.Port)
+			}
 			for _, h := range hosts {
 				if strings.HasPrefix(h, hostport) {
 					exist = true
@@ -146,15 +213,18 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 					}()
 				}
-				log.InfoLog("moa-server", "MoaClientManager|OnAddressChange|Auth|SUCC|%s[%d]|%s|%v", uri, i, h, succ)
+				log.InfoLog("address_manager", "MoaClientManager|OnAddressChange|Auth|SUCC|%s[%d]|%s|%v", uri, i, h, succ)
 			}
 		} else {
-			log.WarnLog("moa-server", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
+			log.WarnLog("address_manager", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
 		}
 
 	}
-	//删除需要删除的客户端
-	self.clientManager.DeleteClients(removeHostport...)
+	if len(removeHostport) > 0 {
+		//删除需要删除的客户端
+		self.clientManager.DeleteClients(removeHostport...)
+		log.WarnLog("address_manager", "MoaClientManager|OnAddressChange|RemoveClients|%s", removeHostport)
+	}
 	func() {
 
 		self.lock.Lock()
@@ -168,8 +238,14 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 //需要开发对应的分包
 func (self MoaClientManager) readDispatcher(remoteClient *client.RemotingClient, p *packet.Packet) {
 	//直接写过去[]byte结构
-	//log.DebugLog("moa-server", "MoaClientManager|readDispatcher|%s", *p)
-	remoteClient.Attach(p.Header.Opaque, p.Data)
+	switch p.Header.CmdType {
+	case CMD_GET:
+		remoteClient.Attach(p.Header.Opaque, p.Data)
+	case CMD_PING:
+		//如果是PONG数据则attach当前时间戳
+		remoteClient.Attach(p.Header.Opaque, time.Now().Unix())
+	}
+
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	self.clientPool[remoteClient.LocalAddr()] <- true

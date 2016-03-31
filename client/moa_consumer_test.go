@@ -4,6 +4,7 @@ import (
 	"github.com/blackbeans/go-moa/proxy"
 	// "runtime"
 	"github.com/blackbeans/go-moa/core"
+	"sync"
 	"testing"
 	"time"
 )
@@ -53,6 +54,7 @@ func TestMakeRpcFunc(t *testing.T) {
 	if nil != err || a.Uri != "/service/user-service" {
 		t.Fail()
 	}
+
 	//---------no return
 	h.SetName("a")
 	//----no args
@@ -80,6 +82,43 @@ func TestMakeRpcFunc(t *testing.T) {
 	// 暂停一下，不然moa-stat统计打印不出来
 	time.Sleep(time.Second * 2)
 
+	consumer.Destory()
+
+}
+
+func TestConsumerPing(t *testing.T) {
+
+	//等待5s注册地址
+	time.Sleep(5 * time.Second)
+
+	consumer := NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/user-service",
+			Interface:  &UserService{}},
+			proxy.Service{
+				ServiceUri: "/service/user-service-panic",
+				Interface:  &UserService{}}})
+	//等待5s注册地址
+	time.Sleep(5 * time.Second)
+
+	wg := sync.WaitGroup{}
+	clone := consumer.clientManager.clientManager.ClientsClone()
+	wg.Add(len(clone))
+	//等待空闲
+	time.Sleep(10 * time.Second)
+	for _, c := range clone {
+		go func() {
+			defer wg.Done()
+			succ := consumer.clientManager.ping(c)
+			t.Logf("[%s] ping %v", c.LocalAddr(), succ)
+			if !succ {
+				t.Fail()
+			}
+		}()
+	}
+	//等待本次的所有的PING—PONG结束
+	wg.Wait()
+	consumer.Destory()
 }
 
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
