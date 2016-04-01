@@ -127,6 +127,7 @@ func (self MoaClientCodeC) MarshalPacket(p *packet.Packet) []byte {
 		buff.WriteString(body)
 		buff.WriteString("\r\n")
 		b := buff.Bytes()
+		fmt.Println(string(b))
 		return b
 	case CMD_PING:
 		return p.Data
