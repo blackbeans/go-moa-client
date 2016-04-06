@@ -44,7 +44,7 @@ type MoaClientCodeC struct {
 //直接获取data
 func (self MoaClientCodeC) Read(reader *bufio.Reader) (*bytes.Buffer, error) {
 
-	line, isPrefix, err := reader.ReadLine()
+	line, _, err := reader.ReadLine()
 	if nil != err {
 		return nil, errors.New("MoaClientCodeC Read Command Args Count Packet Err " + err.Error())
 	}
@@ -52,46 +52,18 @@ func (self MoaClientCodeC) Read(reader *bufio.Reader) (*bytes.Buffer, error) {
 	if start {
 		//$n\r\n[data]\r\n
 		//获取到共有多少个\r\n
-		l, _ := strconv.ParseInt(string(line[1:]), 10, 64)
-		length := int(l)
+		length, _ := strconv.Atoi(string(line[1:]))
 		if length >= self.MaxFrameLength {
 			return nil, errors.New(fmt.Sprintf("MoaClientCodeC Too Large Packet %d/%d", length, self.MaxFrameLength))
 		}
-		//读取数组长度和对应的值
-		//bodyLen+body+CommandType
-		//4B+body+1B 是为了给将长度协议类型附加在dataBuff的末尾
-		tmp := bytes.NewBuffer(make([]byte, 0, 4+length+1))
-		b.Write(tmp, b.BigEndian, int32(length))
-		dl := 0
-		for {
-			line, isPrefix, err = reader.ReadLine()
-			if nil != err {
-				return nil, errors.New("MoaClientCodeC Read Packet Data Err " + err.Error())
-			}
 
-			//如果超过了给定的长度则忽略
-			if (dl + len(line)) > length {
-				return nil, errors.New(fmt.Sprintf("MoaClientCodeC Invalid Packet Data %d/%d ", (dl + len(line)), length))
-			}
-
-			//没有读取完这个命令的字节继续读取
-			l, er := tmp.Write(line)
-			if nil != err {
-				return nil, errors.New("MoaClientCodeC Write Packet Into Buff  Err " + er.Error())
-			}
-			//读取完这个命令的字节
-			if !isPrefix {
-				break
-			} else {
-
-			}
-			dl += l
+		buff, err := self.readData(length, reader)
+		if nil != err {
+			return nil, err
 		}
-
-		//写入命令类型
-		tmp.WriteByte(CMD_GET)
+		buff[len(buff)-1] = CMD_GET
 		//得到了get和数据将数据返回出去
-		return tmp, nil
+		return bytes.NewBuffer(buff), nil
 	} else if bytes.HasPrefix(line, PONG) {
 		//返回的是字符串、看看是不是PONG
 		return bytes.NewBuffer(PONG_BYTES), nil
@@ -100,13 +72,41 @@ func (self MoaClientCodeC) Read(reader *bufio.Reader) (*bytes.Buffer, error) {
 	}
 }
 
+func (self MoaClientCodeC) readData(length int, reader *bufio.Reader) ([]byte, error) {
+	//bodyLen+body+CommandType
+	//4B+body+1B 是为了给将长度协议类型附加在dataBuff的末尾
+	buff := make([]byte, 4+length+1)
+	b.BigEndian.PutUint32(buff[0:4], uint32(length))
+	dl := 0
+	for {
+
+		l, err := reader.Read(buff[dl+4 : 4+length])
+		if nil != err {
+			return buff, errors.New("MoaClientCodeC Read Command Data Packet Err " + err.Error())
+		}
+
+		dl += l
+		//如果超过了给定的长度则忽略
+		if dl > length {
+			return buff, errors.New(fmt.Sprintf("MoaClientCodeC Invalid Packet Data readData:[%d/%d]\t%s ",
+				dl, length, string(buff[4:dl])))
+		} else if dl == length {
+			//略过\r\n
+			break
+		}
+	}
+	reader.Discard(2)
+	return buff, nil
+}
+
 //反序列化
 //包装为packet，但是头部没有信息
 func (self MoaClientCodeC) UnmarshalPacket(buff *bytes.Buffer) (*packet.Packet, error) {
-	var l int32
-	b.Read(buff, b.BigEndian, &l)
-	d := buff.Bytes()
-	return packet.NewRespPacket(0, d[l], d[:l]), nil
+	buf := buff.Bytes()
+	l := int(b.BigEndian.Uint32(buf[0:4]))
+	data := buf[4 : 4+l]
+	cmdType := buf[len(buf)-1]
+	return packet.NewRespPacket(0, cmdType, data), nil
 }
 
 //序列化
@@ -127,7 +127,6 @@ func (self MoaClientCodeC) MarshalPacket(p *packet.Packet) []byte {
 		buff.WriteString(body)
 		buff.WriteString("\r\n")
 		b := buff.Bytes()
-		fmt.Println(string(b))
 		return b
 	case CMD_PING:
 		return p.Data

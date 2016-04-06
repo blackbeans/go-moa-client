@@ -39,50 +39,51 @@ func init() {
 func TestMakeRpcFunc(t *testing.T) {
 
 	//等待5s注册地址
-	time.Sleep(5 * time.Minute)
+	time.Sleep(5 * time.Second)
 
-	// consumer := NewMoaConsumer("../conf/moa_client.toml",
-	// 	[]proxy.Service{proxy.Service{
-	// 		ServiceUri: "/service/user-service",
-	// 		Interface:  &UserService{}},
-	// 		proxy.Service{
-	// 			ServiceUri: "/service/user-service-panic",
-	// 			Interface:  &UserService{}}})
-	// h := consumer.GetService("/service/user-service").(*UserService)
-	// a, err := h.GetName("a")
-	// t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
-	// if nil != err || a.Uri != "/service/user-service" {
-	// 	t.Fail()
-	// }
+	consumer := NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/user-service",
+			Interface:  &UserService{}},
+			proxy.Service{
+				ServiceUri: "/service/user-service-panic",
+				Interface:  &UserService{}}})
+	time.Sleep(5 * time.Second)
+	h := consumer.GetService("/service/user-service").(*UserService)
+	a, err := h.GetName("a")
+	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
+	if nil != err || a.Uri != "/service/user-service" {
+		t.Fail()
+	}
 
+	// ---------no return
+	h.SetName("a")
+	//----no args
+	err = h.Ping()
+	t.Logf("--------Ping|%s\n", err)
+	if nil != err {
+		t.Fail()
+	}
+
+	_, err = h.Pong()
+	t.Logf("--------Pong|%s\n", err)
+	if nil != err {
+		t.Fail()
+	}
+
+	h = consumer.GetService("/service/user-service-panic").(*UserService)
+	a, err = h.GetName("a")
+	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
+	if nil == err || nil != a {
+		t.Fail()
+	}
 	//---------no return
-	// h.SetName("a")
-	// //----no args
-	// err = h.Ping()
-	// t.Logf("--------Ping|%s\n", err)
-	// if nil != err {
-	// 	t.Fail()
-	// }
-
-	// _, err = h.Pong()
-	// t.Logf("--------Pong|%s\n", err)
-	// if nil != err {
-	// 	t.Fail()
-	// }
-
-	// h = consumer.GetService("/service/user-service-panic").(*UserService)
-	// a, err = h.GetName("a")
-	// t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
-	// if nil == err || nil != a {
-	// 	t.Fail()
-	// }
-	// //---------no return
-	// h.SetName("a")
+	h.SetName("a")
 
 	// 暂停一下，不然moa-stat统计打印不出来
-	// time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 2)
 
-	// consumer.Destory()
+	consumer.Destory()
 
 }
 
