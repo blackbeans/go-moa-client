@@ -143,14 +143,16 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 
 func BenchmarkMakeRpcFunc(b *testing.B) {
 
+	b.StopTimer()
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
+	h := consumer.GetService("/service/user-service").(*UserService)
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		h := consumer.GetService("/service/user-service").(*UserService)
 		a, _ := h.GetName("a")
-		b.Logf("--------Hello,Buddy|%s\n", a)
+		// b.Logf("--------Hello,Buddy|%s\n", a)
 		if a.Uri != "/service/user-service" {
 			b.Fail()
 		}

@@ -121,7 +121,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 
 	}
 	//2.组装请求协议
-	cmd := protocol.CommandRequest{}
+	cmd := protocol.MoaReqPacket{}
 	cmd.ServiceUri = s.ServiceUri
 	cmd.Params.Method = method
 	args := make([]interface{}, 0, 3)
@@ -146,7 +146,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		return errFunc(&err)
 	}
 
-	var resp protocol.MoaRespPacket
+	var resp protocol.MoaRawRespPacket
 	err = json.Unmarshal(result.([]byte), &resp)
 	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", s.ServiceUri, method, string(result.([]byte)))
 	if nil != err {
@@ -165,37 +165,16 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	//执行成功
 	if resp.ErrCode == protocol.CODE_SERVER_SUCC {
 		if nil != resultType {
-			vl := reflect.ValueOf(resp.Result)
-			//类型相等应该就是原则类型了吧、不是数组并且两个类型一样
-			if resultType == vl.Type() {
-				return []reflect.Value{vl, reflect.Zero(errorType)}
-			} else if vl.Kind() == reflect.Map ||
-				vl.Kind() == reflect.Slice {
-				//可能是对象类型则需要序列化为该对象
-				data, err := json.Marshal(resp.Result)
-				if nil != err {
-					log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s", s.ServiceUri, method, resp.Result)
-					return errFunc(&err)
-				} else {
-					inst := reflect.New(resultType)
 
-					if len(data) > 0 {
-						uerr := json.Unmarshal(data, inst.Interface())
-						if nil != uerr {
-							return errFunc(&uerr)
-						}
-					}
-					return []reflect.Value{inst.Elem(), reflect.Zero(errorType)}
+			//可能是对象类型则需要序列化为该对象
+			inst := reflect.New(resultType)
+			if len(data) > 0 {
+				uerr := json.Unmarshal(resp.Result, inst.Interface())
+				if nil != uerr {
+					return errFunc(&uerr)
 				}
-			} else {
-
-				log.ErrorLog("moa_client",
-					"MoaConsumer|rpcInvoke|UnSupport Return Type|%s|%s|%s|%s",
-					s.ServiceUri, method, resp.Result, resultType.String())
-				err = errors.New(fmt.Sprintf("UnSupport Return Type|%s|%s|%s|%s",
-					resp.Result, resultType.String()))
-				return errFunc(&err)
 			}
+			return []reflect.Value{inst.Elem(), reflect.Zero(errorType)}
 		} else {
 			//只有error的情况,没有错误返回成功
 			return []reflect.Value{reflect.Zero(errorType)}
