@@ -23,7 +23,7 @@ serviceUriSuffix=""
 	[clusters.dev]
 		#env=dev/online
 		env="dev" 
-		logFile="../conf/log_test.xml"
+		logFile="conf/log_test.xml"
 		processTimeout=5
 		#最大分发处理协程数
 		maxDispatcherSize=8000 
@@ -40,7 +40,7 @@ serviceUriSuffix=""
 	[clusters.online]
 		#env=dev/online
 		env="online" 
-		logFile="../conf/log_test.xml"
+		logFile="conf/log_test.xml"
 		processTimeout=5
 		#最大分发处理协程数
 		maxDispatcherSize=8000 
