@@ -151,10 +151,11 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 	h := consumer.GetService("/service/user-service").(*UserService)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		a, _ := h.GetName("a")
+		h.GetName("a")
+		// a, _ := h.GetName("a")
 		// b.Logf("--------Hello,Buddy|%s\n", a)
-		if a.Uri != "/service/user-service" {
-			b.Fail()
-		}
+		// if a.Uri != "/service/user-service" {
+		// 	b.Fail()
+		// }
 	}
 }

@@ -1,10 +1,12 @@
 #### MOA Client使用方式
 
 * 安装：
-    - 因为使用了私有仓库因此必须使用 —insecure参数
+     安装ZooKeeper
+        $Zookeeper/bin/zkServer.sh start
+
     ``` 
-    go get -insecure github.com/blackbeans/go-moa-client/client
-    go get -insecure github.com/blackbeans/go-moa/proxy
+    go get  github.com/blackbeans/go-moa-client/client
+    go get  github.com/blackbeans/go-moa/proxy
     
     ```
 
@@ -44,4 +46,12 @@
     - Service为一个服务单元，对应了远程调用的服务名称、以及对应的接口
 
     - MoaConsumer需要对应的Moa的配置文件，toml类型，具体配置参见conf/moa_client.toml
+    
+ * Benchmark
+
+    env:Macbook Pro 2.2 GHz Intel Core i7
+
+    go test --bench=".*" github.com/blackbeans/go-moa-client/client -run=BenchmarkMakeRpcFunc
+
+    BenchmarkMakeRpcFunc-8    20000         64517 ns/op
 
