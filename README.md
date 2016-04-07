@@ -47,11 +47,20 @@
 
     - MoaConsumer需要对应的Moa的配置文件，toml类型，具体配置参见conf/moa_client.toml
     
- * Benchmark
+* Benchmark
 
     env:Macbook Pro 2.2 GHz Intel Core i7
 
     go test --bench=".*" github.com/blackbeans/go-moa-client/client -run=BenchmarkMakeRpcFunc
 
     BenchmarkMakeRpcFunc-8    20000         64517 ns/op
+* redis-benchmark
+
+    -  env:Macbook Pro 2.2 GHz Intel Core i7
+  
+    -  go run github.com/blackbeans/go-moa-client/benchmark.go
+
+    redis-benchmark -h host -p 13000 -n 1000000 -c 100 get '{"action":"/service/bibi/go-moa","params":{"m":"setName","args":["a"]}}'
+
+
 
