@@ -1,4 +1,7 @@
 #### MOA Client使用方式
+* Usage
+     
+     [样例参考](https://github.com/blackbeans/go-moa-demo)
 
 * 安装：
      安装ZooKeeper
