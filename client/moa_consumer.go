@@ -120,6 +120,9 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		return errFunc(&err)
 
 	}
+	//release client
+	defer self.clientManager.ReleaseClient(c)
+
 	//2.组装请求协议
 	cmd := protocol.MoaReqPacket{}
 	cmd.ServiceUri = s.ServiceUri
@@ -140,14 +143,26 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	//4.等待响应、超时、异常处理
 	result, err := c.WriteAndGet(*reqPacket, self.options.ProcessTimeout)
 	//5.返回调用结果
-	//fmt.Printf("MoaConsumer|rpcInvoke|InvokeFail|%s|%s|%s\n", err, cmd)
 	if nil != err {
+		//response error and close this connection
+		//and wait reconnect and create new client
+		c.Shutdown()
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s", err, cmd)
 		return errFunc(&err)
 	}
 
+	respData, ok := result.([]byte)
+	if !ok {
+		//response type assert fail, close this connection
+		//and wait reconnect and create new client
+		c.Shutdown()
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|Pipeline Broken|%s|%s", cmd, result)
+		err = errors.New("Pipeline Broken")
+		return errFunc(&err)
+	}
+
 	var resp protocol.MoaRawRespPacket
-	err = json.Unmarshal(result.([]byte), &resp)
+	err = json.Unmarshal(respData, &resp)
 	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", s.ServiceUri, method, string(result.([]byte)))
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))

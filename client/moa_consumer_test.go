@@ -39,7 +39,7 @@ func init() {
 func TestMakeRpcFunc(t *testing.T) {
 
 	//等待5s注册地址
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
@@ -48,7 +48,7 @@ func TestMakeRpcFunc(t *testing.T) {
 			proxy.Service{
 				ServiceUri: "/service/user-service-panic",
 				Interface:  &UserService{}}})
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 	h := consumer.GetService("/service/user-service").(*UserService)
 	a, err := h.GetName("a")
 	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
@@ -73,7 +73,7 @@ func TestMakeRpcFunc(t *testing.T) {
 
 	h = consumer.GetService("/service/user-service-panic").(*UserService)
 	a, err = h.GetName("a")
-	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
+	t.Logf("--------Hello,Buddy|%s|error(%s)\n", a, err)
 	if nil == err || nil != a {
 		t.Fail()
 	}
@@ -90,7 +90,7 @@ func TestMakeRpcFunc(t *testing.T) {
 func TestConsumerPing(t *testing.T) {
 
 	//等待5s注册地址
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
@@ -108,9 +108,11 @@ func TestConsumerPing(t *testing.T) {
 	//等待空闲
 	time.Sleep(10 * time.Second)
 	for _, c := range clone {
+		tmp := c
 		go func() {
 			defer wg.Done()
-			succ := consumer.clientManager.ping(c)
+			succ := consumer.clientManager.ping(tmp)
+			consumer.clientManager.ReleaseClient(tmp)
 			t.Logf("[%s] ping %v", c.LocalAddr(), succ)
 			if !succ {
 				t.Fail()

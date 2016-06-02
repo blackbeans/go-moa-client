@@ -10,7 +10,6 @@ import (
 	"github.com/blackbeans/turbo/client"
 	"github.com/blackbeans/turbo/codec"
 	"github.com/blackbeans/turbo/packet"
-	"math"
 	"math/rand"
 	"net"
 	"strings"
@@ -76,9 +75,11 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 			clone := manager.clientManager.ClientsClone()
 			wg.Add(len(clone))
 			for _, c := range clone {
+				tmp := c
 				go func() {
 					defer wg.Done()
-					manager.ping(c)
+					manager.ping(tmp)
+					manager.ReleaseClient(tmp)
 				}()
 			}
 			//等待本次的所有的PING—PONG结束
@@ -91,42 +92,34 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 func (self MoaClientManager) ping(c *client.RemotingClient) bool {
 	succ := false
 	//发起PING请求
-	for i := 0; i < 2; i++ {
-		if c.Idle() && !c.IsClosed() {
-			func() {
-				self.lock.RLock()
-				defer self.lock.RUnlock()
-				select {
-				case <-self.clientPool[c.LocalAddr()]:
-				case <-time.After(self.op.ProcessTimeout * 2):
-					//如果超时还没得到连接可用则放弃本次PING，因为连接正忙
-					succ = true
-					return
-				}
-				//发送PING协议
-				heartbeat := packet.NewRespPacket(0, CMD_PING, PING)
-				err := c.Ping(heartbeat, self.op.ProcessTimeout)
-				if nil != err {
-					//需要关闭连接，然后重连任务会启动重连
-					if i == 1 {
-						c.Shutdown()
-						log.WarnLog("address_manager",
-							"MoaClientManager|checkConnStatus|Ping|FAIL|%s|%s", c.LocalAddr(), err)
-						succ = false
-						return
-					} else {
-						//第一次超时等待第二次PING
-						delay := time.Duration(int64(math.Pow(2, float64(i+1))) * int64(self.op.ProcessTimeout))
-						time.Sleep(delay)
-					}
-				} else {
-					succ = true
-					log.InfoLog("address_manager",
-						"MoaClientManager|checkConnStatus|Ping|SUCC|%s...", c.LocalAddr())
-					return
-				}
-			}()
-		}
+	if c.Idle() && !c.IsClosed() {
+		func() {
+			self.lock.RLock()
+			defer self.lock.RUnlock()
+			select {
+			case <-self.clientPool[c.LocalAddr()]:
+			case <-time.After(self.op.ProcessTimeout * 2):
+				//如果超时还没得到连接可用则放弃本次PING，因为连接正忙
+				succ = true
+				return
+			}
+			//发送PING协议
+			heartbeat := packet.NewRespPacket(0, CMD_PING, PING)
+			err := c.Ping(heartbeat, self.op.ProcessTimeout)
+			if nil != err {
+				//需要关闭连接，然后重连任务会启动重连
+				c.Shutdown()
+				log.WarnLog("address_manager",
+					"MoaClientManager|checkConnStatus|Ping|FAIL|Shutdown|%s|%s", c.LocalAddr(), err)
+				succ = false
+				return
+			} else {
+				succ = true
+				log.InfoLog("address_manager",
+					"MoaClientManager|checkConnStatus|Ping|SUCC|%s...", c.LocalAddr())
+				return
+			}
+		}()
 	}
 
 	return succ
@@ -246,6 +239,10 @@ func (self MoaClientManager) readDispatcher(remoteClient *client.RemotingClient,
 		remoteClient.Attach(p.Header.Opaque, time.Now().Unix())
 	}
 
+}
+
+//release client
+func (self MoaClientManager) ReleaseClient(remoteClient *client.RemotingClient) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	self.clientPool[remoteClient.LocalAddr()] <- true
