@@ -27,7 +27,9 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 	uri2Hosts := make(map[string][]string, 2)
 	center := &AddressManager{serviceUris: uris,
 		registry: registry, uri2Hosts: uri2Hosts, listener: listener}
-	center.loadAvaiableAddress()
+	hosts := center.loadAvaiableAddress()
+	center.uri2Hosts = hosts
+
 	go func() {
 		for {
 			time.Sleep(5 * time.Second)
@@ -38,7 +40,10 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 					}
 				}()
 				//需要定时拉取服务地址
-				center.loadAvaiableAddress()
+				hosts := center.loadAvaiableAddress()
+				center.lock.Lock()
+				center.uri2Hosts = hosts
+				center.lock.Unlock()
 			}()
 		}
 	}()
@@ -46,7 +51,7 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 	return center
 }
 
-func (self AddressManager) loadAvaiableAddress() {
+func (self AddressManager) loadAvaiableAddress() map[string][]string {
 	hosts := make(map[string][]string, 2)
 	for _, uri := range self.serviceUris {
 		for i := 0; i < 3; i++ {
@@ -65,7 +70,7 @@ func (self AddressManager) loadAvaiableAddress() {
 				if len(addrs) > 0 {
 					sort.Strings(addrs)
 					hosts[uri] = addrs
-					log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|GetService|SUCC|%s|%s", uri, addrs)
+					log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|Pull Address|%s|%s", uri, addrs)
 				}
 				//对比变化
 				func() {
@@ -77,24 +82,28 @@ func (self AddressManager) loadAvaiableAddress() {
 					}()
 					self.lock.RLock()
 					defer self.lock.RUnlock()
-					needChange := true
+					needChange := false
 					oldAddrs, ok := self.uri2Hosts[uri]
 					if ok {
 						if len(oldAddrs) > 0 &&
 							len(oldAddrs) == len(addrs) {
 							for j, v := range addrs {
-								//如果是最后一个并且相等那么就应该不需要更新
-								if oldAddrs[j] == v && j == len(addrs)-1 {
-									needChange = false
+								if oldAddrs[j] != v {
+									needChange = true
 									break
 								}
 							}
-
+						} else {
+							needChange = true
 						}
+					} else {
+						needChange = true
 					}
+					log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|NeedChange %v|%s|%s", needChange, uri, addrs)
 					//变化通知
 					if needChange {
 						self.listener(uri, addrs)
+
 					}
 				}()
 
@@ -103,9 +112,8 @@ func (self AddressManager) loadAvaiableAddress() {
 		}
 	}
 
-	self.lock.Lock()
-	self.uri2Hosts = hosts
-	self.lock.Unlock()
+	return hosts
+
 }
 
 var EMPTY_HOSTS = []string{}

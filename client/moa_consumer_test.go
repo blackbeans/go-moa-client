@@ -3,11 +3,14 @@ package client
 import (
 	"github.com/blackbeans/go-moa/proxy"
 	// "runtime"
+
 	"github.com/blackbeans/go-moa/core"
 	"sync"
 	"testing"
 	"time"
 )
+
+var consumer *MoaConsumer
 
 func init() {
 
@@ -33,6 +36,11 @@ func init() {
 				Instance:   UserServicePanic{},
 				Interface:  uinter}}
 	})
+
+	consumer = NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/user-service",
+			Interface:  &UserService{}}})
 
 }
 
@@ -125,17 +133,15 @@ func TestConsumerPing(t *testing.T) {
 }
 
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
-	b.StopTimer()
-	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
-			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}}})
+
 	b.StartTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			h := consumer.GetService("/service/user-service").(*UserService)
-			a, _ := h.GetName("a")
-			if a.Uri != "/service/user-service" {
+			b.Logf("----------start--------\n")
+			a, err := h.GetName("a")
+			b.Logf("----------end--------%s\n", a)
+			if nil != err || a.Uri != "/service/user-service" {
 				b.Fail()
 			}
 		}

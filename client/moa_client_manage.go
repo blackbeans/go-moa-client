@@ -164,33 +164,41 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		for _, h := range hosts {
 			exist := false
 			for _, c := range clients {
-				if strings.HasPrefix(h, c.RemoteAddr()) {
+				if strings.Contains(h, c.RemoteAddr()) {
 					exist = true
 					break
 				}
-
 			}
 			//有新增的地址
 			if !exist {
-				addHostport = append(addHostport, h)
+				contains := false
+				for _, hp := range addHostport {
+					if hp == h {
+						contains = true
+					}
+				}
+
+				if !contains {
+					addHostport = append(addHostport, h)
+				}
 			}
 		}
 	}
+
 	//新增创建
 	for _, h := range addHostport {
 		split := strings.Split(h, "?")
-		conn, err := dial(split[0])
-		if nil == err {
+		//创建规定数量的连接
+		for i := 0; i < self.op.PoolSizePerHost; i++ {
+			conn, err := dial(split[0])
+			if nil == err {
+				//需要开发对应的codec
+				cf := func() codec.ICodec {
+					decoder := MoaClientCodeC{}
+					decoder.MaxFrameLength = 32 * 1024
+					return decoder
+				}
 
-			//需要开发对应的codec
-			cf := func() codec.ICodec {
-				decoder := MoaClientCodeC{}
-				decoder.MaxFrameLength = 32 * 1024
-				return decoder
-			}
-
-			//创建一下连接数
-			for i := 0; i < self.op.PoolSizePerHost; i++ {
 				//创建连接
 				remoteClient := client.NewRemotingClient(conn, cf, self.readDispatcher, self.rc)
 				remoteClient.Start()
@@ -207,11 +215,11 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 					}()
 				}
 				log.InfoLog("address_manager", "MoaClientManager|OnAddressChange|Auth|SUCC|%s[%d]|%s|%v", uri, i, h, succ)
-			}
-		} else {
-			log.WarnLog("address_manager", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
-		}
 
+			} else {
+				log.WarnLog("address_manager", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
+			}
+		}
 	}
 	if len(removeHostport) > 0 {
 		//删除需要删除的客户端
