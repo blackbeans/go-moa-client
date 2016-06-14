@@ -113,7 +113,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 
 	//1.选取服务地址
 	c, err := self.clientManager.SelectClient(s.ServiceUri)
-	//fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, s.ServiceUri)
+	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, s.ServiceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, s.ServiceUri)

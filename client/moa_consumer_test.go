@@ -37,11 +37,6 @@ func init() {
 				Interface:  uinter}}
 	})
 
-	consumer = NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
-			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}}})
-
 }
 
 func TestMakeRpcFunc(t *testing.T) {
@@ -133,11 +128,16 @@ func TestConsumerPing(t *testing.T) {
 }
 
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
-
+	b.StopTimer()
+	consumer = NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/user-service",
+			Interface:  &UserService{}}})
+	time.Sleep(5 * time.Second)
 	b.StartTimer()
 	b.RunParallel(func(pb *testing.PB) {
+		h := consumer.GetService("/service/user-service").(*UserService)
 		for pb.Next() {
-			h := consumer.GetService("/service/user-service").(*UserService)
 			b.Logf("----------start--------\n")
 			a, err := h.GetName("a")
 			b.Logf("----------end--------%s\n", a)
@@ -146,7 +146,8 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 			}
 		}
 	})
-
+	b.StopTimer()
+	consumer.Destory()
 }
 
 func BenchmarkMakeRpcFunc(b *testing.B) {
@@ -156,6 +157,7 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
+	time.Sleep(5 * time.Second)
 	h := consumer.GetService("/service/user-service").(*UserService)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -166,4 +168,6 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 		// 	b.Fail()
 		// }
 	}
+	b.StopTimer()
+	consumer.Destory()
 }

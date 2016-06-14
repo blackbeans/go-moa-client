@@ -20,7 +20,6 @@ import (
 type MoaClientManager struct {
 	clientManager *client.ClientManager
 	clientPool    map[string]chan bool //redis连接不能被多线程复用，必须占位
-	workPool      map[string]chan bool // redis连接工作池
 	addrManager   *AddressManager
 	rc            *turbo.RemotingConfig
 	op            *option.ClientOption
@@ -68,61 +67,60 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
 
-	//开启服务PING PONG
-	go func() {
-		for {
-			time.Sleep(op.ProcessTimeout * 2)
-			wg := sync.WaitGroup{}
-			clone := manager.clientManager.ClientsClone()
-			wg.Add(len(clone))
-			for _, c := range clone {
-				tmp := c
-				go func() {
-					defer wg.Done()
-					manager.ping(tmp)
-					manager.ReleaseClient(tmp)
-				}()
-			}
-			//等待本次的所有的PING—PONG结束
-			wg.Wait()
-		}
-	}()
+	// //开启服务PING PONG
+	// go func() {
+	// 	for {
+	// 		time.Sleep(op.ProcessTimeout * 2)
+	// 		wg := sync.WaitGroup{}
+	// 		clone := manager.clientManager.ClientsClone()
+	// 		wg.Add(len(clone))
+	// 		for _, c := range clone {
+	// 			tmp := c
+	// 			func() {
+	// 				defer func() {
+	// 					wg.Done()
+	// 					manager.ReleaseClient(c)
+	// 				}()
+	// 				if c.Idle() && !c.IsClosed() {
+	// 					manager.ping(tmp)
+	// 				}
+	// 			}()
+	// 		}
+	// 		//等待本次的所有的PING—PONG结束
+	// 		wg.Wait()
+	// 	}
+	// }()
 	return manager
 }
 
 func (self MoaClientManager) ping(c *client.RemotingClient) bool {
 	succ := false
 	//发起PING请求
-	if c.Idle() && !c.IsClosed() {
-		func() {
-			self.lock.RLock()
-			defer self.lock.RUnlock()
-			select {
-			case <-self.clientPool[c.LocalAddr()]:
-			case <-time.After(self.op.ProcessTimeout * 2):
-				//如果超时还没得到连接可用则放弃本次PING，因为连接正忙
-				succ = true
-				return
-			}
-			//发送PING协议
-			heartbeat := packet.NewRespPacket(0, CMD_PING, PING)
-			err := c.Ping(heartbeat, self.op.ProcessTimeout)
-			if nil != err {
-				//需要关闭连接，然后重连任务会启动重连
-				c.Shutdown()
-				log.WarnLog("address_manager",
-					"MoaClientManager|checkConnStatus|Ping|FAIL|Shutdown|%s|%s", c.LocalAddr(), err)
-				succ = false
-				return
-			} else {
-				succ = true
-				log.InfoLog("address_manager",
-					"MoaClientManager|checkConnStatus|Ping|SUCC|%s...", c.LocalAddr())
-				return
-			}
-		}()
+
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	select {
+	case <-self.clientPool[c.LocalAddr()]:
+	case <-time.After(self.op.ProcessTimeout * 2):
+		//如果超时还没得到连接可用则放弃本次PING，因为连接正忙
+		return true
+
 	}
 
+	//发送PING协议
+	heartbeat := packet.NewRespPacket(0, CMD_PING, PING)
+	err := c.Ping(heartbeat, self.op.ProcessTimeout)
+	if nil != err {
+		//需要关闭连接，然后重连任务会启动重连
+		c.Shutdown()
+		log.WarnLog("address_manager",
+			"MoaClientManager|checkConnStatus|Ping|FAIL|Shutdown|%s|%s", c.LocalAddr(), err)
+		return false
+
+	}
+	succ = true
+	log.InfoLog("address_manager",
+		"MoaClientManager|checkConnStatus|Ping|SUCC|%s...", c.LocalAddr())
 	return succ
 
 }
@@ -255,6 +253,7 @@ func (self MoaClientManager) ReleaseClient(remoteClient *client.RemotingClient) 
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	self.clientPool[remoteClient.LocalAddr()] <- true
+
 }
 
 //根据Uri获取连接
@@ -269,26 +268,16 @@ func (self MoaClientManager) SelectClient(uri string) (*client.RemotingClient, e
 		return nil, errors.New("NO Client for [" + uri + "]")
 	} else {
 
+		c := clients[rand.Intn(len(clients))]
 		self.lock.RLock()
 		defer self.lock.RUnlock()
-		//try use an idle client
-		for i := 0; i < 3; i++ {
-			c := clients[rand.Intn(len(clients))]
-			select {
-			case <-self.clientPool[c.LocalAddr()]:
-				return c, nil
-			default:
-				//client using now
-			}
-		}
 		//wait an usable client
-		c := clients[rand.Intn(len(clients))]
 		select {
 		case <-self.clientPool[c.LocalAddr()]:
 			return c, nil
-		case <-time.After(self.op.ProcessTimeout):
-			c.Shutdown()
-			return nil, errors.New(fmt.Sprintf("SelectClient Timeout %s", uri))
+			// case <-time.After(self.op.ProcessTimeout):
+			// 	c.Shutdown()
+			// 	return nil, errors.New(fmt.Sprintf("SelectClient Timeout %s", uri))
 		}
 
 	}
