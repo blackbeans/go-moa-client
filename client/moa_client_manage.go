@@ -267,9 +267,21 @@ func (self MoaClientManager) SelectClient(uri string) (*client.RemotingClient, e
 	if !ok || len(clients) <= 0 {
 		return nil, errors.New("NO Client for [" + uri + "]")
 	} else {
-		c := clients[rand.Intn(len(clients))]
+
 		self.lock.RLock()
 		defer self.lock.RUnlock()
+		//try use an idle client
+		for i := 0; i < 3; i++ {
+			c := clients[rand.Intn(len(clients))]
+			select {
+			case <-self.clientPool[c.LocalAddr()]:
+				return c, nil
+			default:
+				//client using now
+			}
+		}
+		//wait an usable client
+		c := clients[rand.Intn(len(clients))]
 		select {
 		case <-self.clientPool[c.LocalAddr()]:
 			return c, nil
