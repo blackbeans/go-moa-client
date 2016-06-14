@@ -20,6 +20,7 @@ import (
 type MoaClientManager struct {
 	clientManager *client.ClientManager
 	clientPool    map[string]chan bool //redis连接不能被多线程复用，必须占位
+	workPool      map[string]chan bool // redis连接工作池
 	addrManager   *AddressManager
 	rc            *turbo.RemotingConfig
 	op            *option.ClientOption
@@ -286,6 +287,7 @@ func (self MoaClientManager) SelectClient(uri string) (*client.RemotingClient, e
 		case <-self.clientPool[c.LocalAddr()]:
 			return c, nil
 		case <-time.After(self.op.ProcessTimeout):
+			c.Shutdown()
 			return nil, errors.New(fmt.Sprintf("SelectClient Timeout %s", uri))
 		}
 
