@@ -6,24 +6,24 @@ import (
 	"github.com/blackbeans/go-moa-client/option"
 	"github.com/blackbeans/go-moa/lb"
 	log "github.com/blackbeans/log4go"
-	"github.com/blackbeans/turbo"
-	"github.com/blackbeans/turbo/client"
-	"github.com/blackbeans/turbo/codec"
-	"github.com/blackbeans/turbo/packet"
+
+	"gopkg.in/redis.v3"
 	"math/rand"
-	"net"
+
 	"strings"
 	"sync"
 	"time"
 )
 
 type MoaClientManager struct {
-	clientManager *client.ClientManager
-	clientPool    map[string]chan bool //redis连接不能被多线程复用，必须占位
-	addrManager   *AddressManager
-	rc            *turbo.RemotingConfig
-	op            *option.ClientOption
-	lock          sync.RWMutex
+	uri2Pool   map[string] /*uri*/ []*redis.Client
+	ip2Options map[string] /*ip:port*/ *redis.Options
+	ip2Client  map[string] /**ip:port*/ *redis.Client
+	uri2Ips    map[string] /*uri*/ []string /*ip:port*/
+
+	addrManager *AddressManager
+	op          *option.ClientOption
+	lock        sync.RWMutex
 }
 
 const (
@@ -45,262 +45,123 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 		reg = lb.NewZookeeper(op.RegistryHosts, uris)
 	}
 
-	//网络参数
-	rc := turbo.NewRemotingConfig(
-		op.AppName,
-		op.PoolSizePerHost, 16*1024,
-		16*1024, 10000, 10000,
-		1*time.Minute, 10)
-
 	manager := &MoaClientManager{}
-	manager.clientPool = make(map[string]chan bool, 100)
-	//创建连接重连握手回调
-	reconn := client.NewReconnectManager(true, 5*time.Second, 10,
-		func(ga *client.GroupAuth, remoteClient *client.RemotingClient) (bool, error) {
-			//moa中没有握手返回成功
-			return true, nil
-		})
 	manager.op = op
-	manager.rc = rc
-	manager.clientManager = client.NewClientManager(reconn)
-
+	manager.uri2Pool = make(map[string] /*uri*/ []*redis.Client, 10)
+	manager.ip2Options = make(map[string] /*ip:port*/ *redis.Options, 10)
+	manager.ip2Client = make(map[string] /**ip:port*/ *redis.Client, 10)
+	manager.uri2Ips = make(map[string][]string /*ip:port*/, 2)
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
 
-	// //开启服务PING PONG
-	// go func() {
-	// 	for {
-	// 		time.Sleep(op.ProcessTimeout * 2)
-	// 		wg := sync.WaitGroup{}
-	// 		clone := manager.clientManager.ClientsClone()
-	// 		wg.Add(len(clone))
-	// 		for _, c := range clone {
-	// 			tmp := c
-	// 			func() {
-	// 				defer func() {
-	// 					wg.Done()
-	// 					manager.ReleaseClient(c)
-	// 				}()
-	// 				if c.Idle() && !c.IsClosed() {
-	// 					manager.ping(tmp)
-	// 				}
-	// 			}()
-	// 		}
-	// 		//等待本次的所有的PING—PONG结束
-	// 		wg.Wait()
-	// 	}
-	// }()
 	return manager
 }
 
-func (self MoaClientManager) ping(c *client.RemotingClient) bool {
-	succ := false
-	//发起PING请求
-
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-	select {
-	case <-self.clientPool[c.LocalAddr()]:
-	case <-time.After(self.op.ProcessTimeout * 2):
-		//如果超时还没得到连接可用则放弃本次PING，因为连接正忙
-		return true
-
-	}
-
-	//发送PING协议
-	heartbeat := packet.NewRespPacket(0, CMD_PING, PING)
-	err := c.Ping(heartbeat, self.op.ProcessTimeout)
-	if nil != err {
-		//需要关闭连接，然后重连任务会启动重连
-		c.Shutdown()
-		log.WarnLog("address_manager",
-			"MoaClientManager|checkConnStatus|Ping|FAIL|Shutdown|%s|%s", c.LocalAddr(), err)
-		return false
-
-	}
-	succ = true
-	log.InfoLog("address_manager",
-		"MoaClientManager|checkConnStatus|Ping|SUCC|%s...", c.LocalAddr())
-	return succ
-
-}
-
 func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
+	//需要移除的连接
 	removeHostport := make([]string, 0, 2)
-	//创建连接
-	remoteClients := self.clientManager.FindRemoteClients([]string{uri},
-		func(groupId string, rc *client.RemotingClient) bool {
-			exist := false
-			hostport := rc.RemoteAddr()
-			addr, _ := net.ResolveTCPAddr("tcp4", hostport)
-			if addr.IP.To4().IsLoopback() {
-				hostport = fmt.Sprintf("0.0.0.0:%d", addr.Port)
-			}
-			for _, h := range hosts {
-				if strings.HasPrefix(h, hostport) {
-					exist = true
-					break
-				}
-			}
-			//如果不在对应列表中则是需要删除的
-			if !exist {
-				removeHostport = append(removeHostport, hostport)
-			}
-			//不存在直接过滤
-			return !exist
-		})
-
 	//新增地址
 	addHostport := make([]string, 0, 2)
-	clients, ok := remoteClients[uri]
-	//如果不存在则新增
-	if !ok || len(clients) <= 0 {
-		//创建连接
-		addHostport = hosts
-	} else {
-		//如果存在则不新增
 
-		for _, h := range hosts {
-			exist := false
-			for _, c := range clients {
-				if strings.Contains(h, c.RemoteAddr()) {
-					exist = true
-					break
-				}
-			}
-			//有新增的地址
-			if !exist {
-				contains := false
-				for _, hp := range addHostport {
-					if hp == h {
-						contains = true
-					}
-				}
-
-				if !contains {
-					addHostport = append(addHostport, h)
-				}
-			}
-		}
-	}
-
-	//新增创建
-	for _, h := range addHostport {
-		split := strings.Split(h, "?")
-		//创建规定数量的连接
-		for i := 0; i < self.op.PoolSizePerHost; i++ {
-			conn, err := dial(split[0])
-			if nil == err {
-				//需要开发对应的codec
-				cf := func() codec.ICodec {
-					decoder := MoaClientCodeC{}
-					decoder.MaxFrameLength = 32 * 1024
-					return decoder
-				}
-
-				//创建连接
-				remoteClient := client.NewRemotingClient(conn, cf, self.readDispatcher, self.rc)
-				remoteClient.Start()
-				auth := client.NewGroupAuth(uri, self.op.AppSecretKey)
-				succ := self.clientManager.Auth(auth, remoteClient)
-				if succ {
-					func() {
-						self.lock.Lock()
-						defer self.lock.Unlock()
-						ch := make(chan bool, 1)
-						ch <- true
-						self.clientPool[remoteClient.LocalAddr()] = ch
-
-					}()
-				}
-				log.InfoLog("address_manager", "MoaClientManager|OnAddressChange|Auth|SUCC|%s[%d]|%s|%v", uri, i, h, succ)
-
-			} else {
-				log.WarnLog("address_manager", "MoaClientManager|OnAddressChange|Auth|FAIL|%s|%s|%s", err, uri, h)
-			}
-		}
-	}
-	if len(removeHostport) > 0 {
-		//删除需要删除的客户端
-		self.clientManager.DeleteClients(removeHostport...)
-		log.WarnLog("address_manager", "MoaClientManager|OnAddressChange|RemoveClients|%s", removeHostport)
-	}
-	func() {
-
-		self.lock.Lock()
-		defer self.lock.Unlock()
-		for _, h := range removeHostport {
-			delete(self.clientPool, h)
-		}
-	}()
-}
-
-//需要开发对应的分包
-func (self MoaClientManager) readDispatcher(remoteClient *client.RemotingClient, p *packet.Packet) {
-	//直接写过去[]byte结构
-	switch p.Header.CmdType {
-	case CMD_GET:
-		remoteClient.Attach(p.Header.Opaque, p.Data)
-	case CMD_PING:
-		//如果是PONG数据则attach当前时间戳
-		remoteClient.Attach(p.Header.Opaque, time.Now().Unix())
-	}
-
-}
-
-//release client
-func (self MoaClientManager) ReleaseClient(remoteClient *client.RemotingClient) {
 	self.lock.RLock()
-	defer self.lock.RUnlock()
-	self.clientPool[remoteClient.LocalAddr()] <- true
+	//寻找新增连接
+	for _, ip := range hosts {
 
+		_, ok := self.ip2Options[ip]
+		if !ok {
+			addHostport = append(addHostport, ip)
+		}
+	}
+
+	self.lock.RUnlock()
+
+	//新增连接
+	addOp2Clients := make(map[*redis.Options]*redis.Client, 10)
+	for _, hp := range addHostport {
+		op := &redis.Options{
+			Addr:        hp,
+			Password:    "", // no password set
+			DB:          0,  // use default DB
+			PoolSize:    self.op.PoolSizePerHost,
+			PoolTimeout: 10 * time.Minute,
+			ReadTimeout: self.op.ProcessTimeout}
+		//创建redis的实例
+		c := redis.NewClient(op)
+		addOp2Clients[op] = c
+		log.InfoLog("address_manager", "MoaClientManager|Create Client|SUCC|%s", hp)
+	}
+
+	//开始执行新增连接和删除操作
+	self.lock.Lock()
+	//add first
+	for op, c := range addOp2Clients {
+
+		self.ip2Client[op.Addr] = c
+
+		self.ip2Options[op.Addr] = op
+
+		log.InfoLog("address_manager", "MoaClientManager|Store Client|SUCC|%s", op.Addr)
+	}
+
+	//重新构建uri对应的连接组
+	newPool := make([]*redis.Client, 0, 5)
+	for _, ip := range hosts {
+		c, ok := self.ip2Client[ip]
+		if ok {
+			newPool = append(newPool, c)
+		}
+
+	}
+	self.uri2Pool[uri] = newPool
+	self.uri2Ips[uri] = hosts
+	log.InfoLog("address_manager", "MoaClientManager|Store Uri Pool|SUCC|%s|%d", uri, len(newPool))
+	//清理掉不再使用redisClient
+	usingIps := make(map[string]bool, 5)
+	for _, v := range self.uri2Ips {
+		for _, ip := range v {
+			usingIps[ip] = true
+		}
+	}
+
+	for ip := range self.ip2Options {
+		_, ok := usingIps[ip]
+		if !ok {
+			//不再使用了移除
+			removeHostport = append(removeHostport, ip)
+		}
+	}
+
+	for _, hp := range removeHostport {
+		delete(self.ip2Options, hp)
+		c, ok := self.ip2Client[hp]
+		if ok {
+			c.Close()
+			log.WarnLog("address_manager", "MoaClientManager|Remove Expired Client|%s", hp)
+		}
+	}
+	self.lock.Unlock()
+
+	log.InfoLog("address_manager", "MoaClientManager|OnAddressChange|SUCC|%s|%v", uri, hosts)
 }
 
 //根据Uri获取连接
-func (self MoaClientManager) SelectClient(uri string) (*client.RemotingClient, error) {
-	remoteClients := self.clientManager.FindRemoteClients([]string{uri},
-		func(groupId string, rc *client.RemotingClient) bool {
-			return false
-		})
+func (self MoaClientManager) SelectClient(uri string) (*redis.Client, error) {
 
-	clients, ok := remoteClients[uri]
-	if !ok || len(clients) <= 0 {
-		return nil, errors.New("NO Client for [" + uri + "]")
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	pool, ok := self.uri2Pool[uri]
+	if ok {
+		p := pool[rand.Intn(len(pool))]
+		return p, nil
+
 	} else {
-
-		c := clients[rand.Intn(len(clients))]
-		self.lock.RLock()
-		defer self.lock.RUnlock()
-		//wait an usable client
-		select {
-		case <-self.clientPool[c.LocalAddr()]:
-			return c, nil
-			// case <-time.After(self.op.ProcessTimeout):
-			// 	c.Shutdown()
-			// 	return nil, errors.New(fmt.Sprintf("SelectClient Timeout %s", uri))
-		}
-
+		return nil, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))
 	}
 
 }
 
 func (self MoaClientManager) Destory() {
-	self.clientManager.Shutdown()
-}
-
-//创建物理连接
-func dial(hostport string) (*net.TCPConn, error) {
-	//连接
-	remoteAddr, err_r := net.ResolveTCPAddr("tcp4", hostport)
-	if nil != err_r {
-		log.ErrorLog("address_manager", "MoaClientManager|DIAL|RESOLVE ADDR |FAIL|remote:%s\n", err_r)
-		return nil, err_r
+	for _, c := range self.ip2Client {
+		c.Close()
 	}
-	conn, err := net.DialTCP("tcp4", nil, remoteAddr)
-	if nil != err {
-		log.ErrorLog("address_manager", "MoaClientManager|DIAL|%s|FAIL|%s\n", hostport, err)
-		return nil, err
-	}
-
-	return conn, nil
 }

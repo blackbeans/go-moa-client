@@ -8,7 +8,7 @@ import (
 	"github.com/blackbeans/go-moa/protocol"
 	"github.com/blackbeans/go-moa/proxy"
 	log "github.com/blackbeans/log4go"
-	"github.com/blackbeans/turbo/packet"
+
 	"reflect"
 	"strings"
 )
@@ -120,8 +120,6 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		return errFunc(&err)
 
 	}
-	//release client
-	defer self.clientManager.ReleaseClient(c)
 
 	//2.组装请求协议
 	cmd := protocol.MoaReqPacket{}
@@ -139,33 +137,20 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
 		return errFunc(&err)
 	}
-	reqPacket := packet.NewRespPacket(0, CMD_GET, data)
 	//4.等待响应、超时、异常处理
-	result, err := c.WriteAndGet(*reqPacket, self.options.ProcessTimeout)
+	result, err := c.Get(string(data)).Result()
 	//5.返回调用结果
 	if nil != err {
 		//response error and close this connection
-		//and wait reconnect and create new client
-		c.Shutdown()
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s", err, cmd)
 		return errFunc(&err)
 	}
 
-	respData, ok := result.([]byte)
-	if !ok {
-		//response type assert fail, close this connection
-		//and wait reconnect and create new client
-		c.Shutdown()
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|Pipeline Broken|%s|%s", cmd, result)
-		err = errors.New("Pipeline Broken")
-		return errFunc(&err)
-	}
-
 	var resp protocol.MoaRawRespPacket
-	err = json.Unmarshal(respData, &resp)
+	err = json.Unmarshal([]byte(result), &resp)
 	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", s.ServiceUri, method, string(result.([]byte)))
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", s.ServiceUri, method, string(result.([]byte)))
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", s.ServiceUri, method, result)
 		return errFunc(&err)
 	}
 
