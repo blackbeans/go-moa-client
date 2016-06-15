@@ -1,0 +1,108 @@
+{
+	"ImportPath": "github.com/blackbeans/go-moa-client",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v73",
+	"Deps": [
+		{
+			"ImportPath": "github.com/blackbeans/go-moa/core",
+			"Rev": "20a9a749876fd47c3d4dcf31b3ef6bf241a69990"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/go-moa/lb",
+			"Rev": "20a9a749876fd47c3d4dcf31b3ef6bf241a69990"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/go-moa/log4moa",
+			"Rev": "20a9a749876fd47c3d4dcf31b3ef6bf241a69990"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/go-moa/protocol",
+			"Rev": "20a9a749876fd47c3d4dcf31b3ef6bf241a69990"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/go-moa/proxy",
+			"Rev": "20a9a749876fd47c3d4dcf31b3ef6bf241a69990"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/go-zookeeper/zk",
+			"Rev": "e9ca0f2da2a7e4b72457d5a0df3f941caf92954e"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/log4go",
+			"Comment": "go.weekly.2012-02-22-33-ga3e8667",
+			"Rev": "a3e8667bde659648ee7ada0a544bf466910fc1f7"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/turbo",
+			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/turbo/client",
+			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/turbo/codec",
+			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/turbo/packet",
+			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/turbo/server",
+			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+		},
+		{
+			"ImportPath": "github.com/blackbeans/turbo/session",
+			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+		},
+		{
+			"ImportPath": "github.com/go-errors/errors",
+			"Rev": "a41850380601eeb43f4350f7d17c6bbd8944aaf8"
+		},
+		{
+			"ImportPath": "github.com/naoina/go-stringutil",
+			"Comment": "v0.1.0",
+			"Rev": "6b638e95a32d0c1131db0e7fe83775cbea4a0d0b"
+		},
+		{
+			"ImportPath": "github.com/naoina/toml",
+			"Comment": "v0.1.0",
+			"Rev": "751171607256bb66e64c9f0220c00662420c38e9"
+		},
+		{
+			"ImportPath": "github.com/naoina/toml/ast",
+			"Comment": "v0.1.0",
+			"Rev": "751171607256bb66e64c9f0220c00662420c38e9"
+		},
+		{
+			"ImportPath": "gopkg.in/bsm/ratelimit.v1",
+			"Rev": "db14e161995a5177acef654cb0dd785e8ee8bc22"
+		},
+		{
+			"ImportPath": "gopkg.in/redis.v3",
+			"Comment": "v3.6.2",
+			"Rev": "5183f8dcde9737db7583dbfa9881800dba26e3fa"
+		},
+		{
+			"ImportPath": "gopkg.in/redis.v3/internal",
+			"Comment": "v3.6.2",
+			"Rev": "5183f8dcde9737db7583dbfa9881800dba26e3fa"
+		},
+		{
+			"ImportPath": "gopkg.in/redis.v3/internal/consistenthash",
+			"Comment": "v3.6.2",
+			"Rev": "5183f8dcde9737db7583dbfa9881800dba26e3fa"
+		},
+		{
+			"ImportPath": "gopkg.in/redis.v3/internal/hashtag",
+			"Comment": "v3.6.2",
+			"Rev": "5183f8dcde9737db7583dbfa9881800dba26e3fa"
+		},
+		{
+			"ImportPath": "gopkg.in/redis.v3/internal/pool",
+			"Comment": "v3.6.2",
+			"Rev": "5183f8dcde9737db7583dbfa9881800dba26e3fa"
+		}
+	]
+}

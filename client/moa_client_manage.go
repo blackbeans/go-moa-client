@@ -138,6 +138,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 			c.Close()
 			log.WarnLog("address_manager", "MoaClientManager|Remove Expired Client|%s", hp)
 		}
+		delete(self.ip2Client, hp)
 	}
 	self.lock.Unlock()
 

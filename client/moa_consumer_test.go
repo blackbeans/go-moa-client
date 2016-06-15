@@ -115,6 +115,43 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 	consumer.Destory()
 }
 
+func TestClientChange(t *testing.T) {
+	consumer := NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/user-service",
+			Interface:  &UserService{}}})
+
+	succ := consumer.clientManager.addrManager.registry.RegisteService("/service/user-service", "127.0.0.3:1300", "redis")
+	if !succ {
+		t.Fail()
+		return
+	}
+	t.Logf("RegisteService|SUCC|%s", "127.0.0.3:1300")
+	time.Sleep(5 * time.Second)
+
+	_, ok := consumer.clientManager.ip2Client["127.0.0.3:1300"]
+	if !ok {
+		t.Fail()
+		t.Logf("RegisteService|SUCC|But Client Not Get|%s", "127.0.0.3:1300")
+		return
+	}
+
+	t.Log("-----------Remove Node 127.0.0.3:1300")
+
+	succ = consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service", "127.0.0.3:1300", "redis")
+	if !succ {
+		t.Fail()
+		return
+	}
+	time.Sleep(5 * time.Second)
+	_, ok = consumer.clientManager.ip2Client["127.0.0.3:1300"]
+	if ok {
+		t.Fail()
+		t.Logf("UnRegisteService|SUCC|But Client  Get It |%s", "127.0.0.3:1300")
+		return
+	}
+}
+
 func BenchmarkMakeRpcFunc(b *testing.B) {
 
 	b.StopTimer()
