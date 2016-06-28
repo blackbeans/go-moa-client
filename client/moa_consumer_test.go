@@ -150,6 +150,8 @@ func TestClientChange(t *testing.T) {
 		t.Logf("UnRegisteService|SUCC|But Client  Get It |%s", "127.0.0.3:1300")
 		return
 	}
+
+	consumer.Destory()
 }
 
 func BenchmarkMakeRpcFunc(b *testing.B) {

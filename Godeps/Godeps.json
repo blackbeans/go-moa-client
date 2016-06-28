@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/blackbeans/go-moa-client",
+	"ImportPath": "go-moa-client",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v73",
 	"Deps": [
@@ -29,32 +29,32 @@
 		},
 		{
 			"ImportPath": "github.com/blackbeans/log4go",
-			"Comment": "go.weekly.2012-02-22-33-ga3e8667",
-			"Rev": "a3e8667bde659648ee7ada0a544bf466910fc1f7"
+			"Comment": "go.weekly.2012-02-22-37-gc4c6801",
+			"Rev": "c4c6801b024dc5dde10832735571729d571d08fa"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo",
-			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/client",
-			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/codec",
-			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/packet",
-			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/server",
-			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/session",
-			"Rev": "8bfbecefadd3ba92913b43d075647e17cdeeddac"
+			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
 		},
 		{
 			"ImportPath": "github.com/go-errors/errors",

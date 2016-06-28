@@ -92,6 +92,15 @@ func NewFileLogWriter(fname string, rotate bool, daily bool) *FileLogWriter {
 				if !ok {
 					return
 				}
+
+				if (w.maxlines > 0 && w.maxlines_curlines >= w.maxlines) ||
+					(w.maxsize > 0 && w.maxsize_cursize >= w.maxsize) {
+					if err := w.intRotate(); err != nil {
+						fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
+						return
+					}
+				}
+
 				now := time.Now()
 				//如果是开启了并且按天滚动，并且已经换了一天需要重建
 				if w.daily {
@@ -100,12 +109,6 @@ func NewFileLogWriter(fname string, rotate bool, daily bool) *FileLogWriter {
 							fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
 							return
 						}
-					}
-				} else if !w.daily && ((w.maxlines > 0 && w.maxlines_curlines >= w.maxlines) ||
-					(w.maxsize > 0 && w.maxsize_cursize >= w.maxsize)) {
-					if err := w.intRotate(); err != nil {
-						fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
-						return
 					}
 				}
 
@@ -146,20 +149,25 @@ func (w *FileLogWriter) intRotate() error {
 			// Find the next available number
 			num := 1
 			fname := w.filename
-			if w.daily {
-				if time.Now().Day() != w.daily_opendate {
-					t := time.Now().Add(-24 * time.Hour).Format("2006-01-02")
-					fname = w.filename + fmt.Sprintf(".%s", t)
-				}
-			} else {
-				for ; err == nil && num <= 999; num++ {
+
+			for ; err == nil && num <= 999; num++ {
+				if w.daily {
+					if time.Now().Day() != w.daily_opendate {
+						t := time.Now().Add(-24 * time.Hour).Format("2006-01-02")
+						fname = w.filename + fmt.Sprintf(".%s.%03d", t, num)
+					} else {
+						t := time.Now().Format("2006-01-02")
+						fname = w.filename + fmt.Sprintf(".%s.%03d", t, num)
+					}
+				} else {
 					fname = w.filename + fmt.Sprintf(".%03d", num)
-					_, err = os.Lstat(fname)
 				}
-				// return error if the last file checked still existed
-				if err == nil {
-					return fmt.Errorf("Rotate: Cannot find free log number to rename %s\n", w.filename)
-				}
+
+				_, err = os.Lstat(fname)
+			}
+			// return error if the last file checked still existed
+			if err == nil {
+				return fmt.Errorf("Rotate: Cannot find free log number to rename %s\n", w.filename)
 			}
 
 			// Rename the file to its newfound home
