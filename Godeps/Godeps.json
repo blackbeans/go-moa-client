@@ -34,27 +34,27 @@
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo",
-			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
+			"Rev": "32bc3ba3805b86b89887fec17208afae8378c51e"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/client",
-			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
+			"Rev": "32bc3ba3805b86b89887fec17208afae8378c51e"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/codec",
-			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
+			"Rev": "32bc3ba3805b86b89887fec17208afae8378c51e"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/packet",
-			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
+			"Rev": "32bc3ba3805b86b89887fec17208afae8378c51e"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/server",
-			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
+			"Rev": "32bc3ba3805b86b89887fec17208afae8378c51e"
 		},
 		{
 			"ImportPath": "github.com/blackbeans/turbo/session",
-			"Rev": "f96017bd73697e25959594aa7a5d32ae6b50575a"
+			"Rev": "32bc3ba3805b86b89887fec17208afae8378c51e"
 		},
 		{
 			"ImportPath": "github.com/go-errors/errors",
