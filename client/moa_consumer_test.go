@@ -143,7 +143,7 @@ func TestClientChange(t *testing.T) {
 		t.Fail()
 		return
 	}
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 	_, ok = consumer.clientManager.ip2Client["127.0.0.3:1300"]
 	if ok {
 		t.Fail()
