@@ -2,10 +2,12 @@ package option
 
 import (
 	"errors"
+	"github.com/blackbeans/go-moa-client/client/hash"
 	log "github.com/blackbeans/log4go"
 	"github.com/naoina/toml"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -32,10 +34,11 @@ type Option struct {
 //----------------------------------------
 //Cluster配置
 type Cluster struct {
-	Env             string //当前环境使用的是dev还是online
-	ProcessTimeout  int    //处理超时 5 s单位
-	PoolSizePerHost int    //5
-	LogFile         string //log4go的文件路径
+	Env              string //当前环境使用的是dev还是online
+	ProcessTimeout   int    //处理超时 5 s单位
+	PoolSizePerHost  int    //5
+	LogFile          string //log4go的文件路径
+	SelectorStrategy string //客户端选择连接方式 ketama/random 默认random
 }
 
 //---------最终需要的ClientCOption
@@ -47,6 +50,7 @@ type ClientOption struct {
 	ProcessTimeout   time.Duration
 	PoolSizePerHost  int
 	ServiceUriSuffix string
+	SelectorStrategy hash.StrategyType
 }
 
 func LoadConfiruation(path string) (*ClientOption, error) {
@@ -89,6 +93,17 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 	mop.RegistryHosts = reg.Hosts
 	mop.ProcessTimeout = time.Duration(int64(cluster.ProcessTimeout) * int64(time.Second))
 	mop.PoolSizePerHost = cluster.PoolSizePerHost
+
+	strategy := hash.STRATEGY_RANDOM
+	switch strings.ToUpper(cluster.SelectorStrategy) {
+	case "KETAMA":
+		strategy = hash.STRATEGY_KETAMA
+	case "RANDOM":
+		fallthrough
+	default:
+		strategy = hash.STRATEGY_RANDOM
+	}
+	mop.SelectorStrategy = hash.StrategyType(strategy)
 	return mop, nil
 
 }

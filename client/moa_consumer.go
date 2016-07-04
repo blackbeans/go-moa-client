@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,15 +9,16 @@ import (
 	"github.com/blackbeans/go-moa/protocol"
 	"github.com/blackbeans/go-moa/proxy"
 	log "github.com/blackbeans/log4go"
-
 	"reflect"
 	"strings"
+	"sync"
 )
 
 type MoaConsumer struct {
 	services      map[string]proxy.Service
 	options       *option.ClientOption
 	clientManager *MoaClientManager
+	buffPool      *sync.Pool
 }
 
 func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
@@ -38,6 +40,12 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 	consumer.services = services
 	consumer.options = options
 	consumer.clientManager = NewMoaClientManager(options, uris)
+	pool := &sync.Pool{}
+	pool.New = func() interface{} {
+		return bytes.NewBuffer(make([]byte, 0, 1024))
+	}
+	consumer.buffPool = pool
+
 	//添加代理
 	for _, s := range ps {
 		consumer.makeRpcFunc(s)
@@ -111,8 +119,27 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		return retVal
 	}
 
-	//1.选取服务地址
-	c, err := self.clientManager.SelectClient(s.ServiceUri)
+	//1.组装请求协议
+	cmd := protocol.MoaReqPacket{}
+	cmd.ServiceUri = s.ServiceUri
+	cmd.Params.Method = method
+	args := make([]interface{}, 0, 3)
+
+	buff := self.buffPool.Get().(*bytes.Buffer)
+	defer func() {
+		buff.Reset()
+		self.buffPool.Put(buff)
+	}()
+
+	for _, arg := range in {
+		args = append(args, arg.Interface())
+		buff.WriteString(arg.String())
+
+	}
+	cmd.Params.Args = args
+
+	//2.选取服务地址
+	c, err := self.clientManager.SelectClient(s.ServiceUri, buff.String())
 	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, s.ServiceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
@@ -121,15 +148,6 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 
 	}
 
-	//2.组装请求协议
-	cmd := protocol.MoaReqPacket{}
-	cmd.ServiceUri = s.ServiceUri
-	cmd.Params.Method = method
-	args := make([]interface{}, 0, 3)
-	for _, arg := range in {
-		args = append(args, arg.Interface())
-	}
-	cmd.Params.Args = args
 	//3.发送网络请求
 	data, err := json.Marshal(cmd)
 	//fmt.Printf("MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s\n", err, cmd)

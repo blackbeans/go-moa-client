@@ -116,6 +116,8 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 }
 
 func TestClientChange(t *testing.T) {
+
+	time.Sleep(5 * time.Second)
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
@@ -127,7 +129,7 @@ func TestClientChange(t *testing.T) {
 		return
 	}
 	t.Logf("RegisteService|SUCC|%s", "127.0.0.3:1300")
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	_, ok := consumer.clientManager.ip2Client["127.0.0.3:1300"]
 	if !ok {

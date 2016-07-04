@@ -3,12 +3,12 @@ package client
 import (
 	"errors"
 	"fmt"
+	"github.com/blackbeans/go-moa-client/client/hash"
 	"github.com/blackbeans/go-moa-client/option"
 	"github.com/blackbeans/go-moa/lb"
 	log "github.com/blackbeans/log4go"
 
 	"gopkg.in/redis.v3"
-	"math/rand"
 
 	"strings"
 	"sync"
@@ -19,7 +19,8 @@ type MoaClientManager struct {
 	uri2Pool   map[string] /*uri*/ []*redis.Client
 	ip2Options map[string] /*ip:port*/ *redis.Options
 	ip2Client  map[string] /**ip:port*/ *redis.Client
-	uri2Ips    map[string] /*uri*/ []string /*ip:port*/
+	// []string /*ip:port*/
+	uri2Ips map[string] /*uri*/ hash.Strategy
 
 	addrManager *AddressManager
 	op          *option.ClientOption
@@ -50,7 +51,7 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 	manager.uri2Pool = make(map[string] /*uri*/ []*redis.Client, 10)
 	manager.ip2Options = make(map[string] /*ip:port*/ *redis.Options, 10)
 	manager.ip2Client = make(map[string] /**ip:port*/ *redis.Client, 10)
-	manager.uri2Ips = make(map[string][]string /*ip:port*/, 2)
+	manager.uri2Ips = make(map[string]hash.Strategy, 2)
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
 
@@ -113,14 +114,22 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 	}
 	self.uri2Pool[uri] = newPool
-	self.uri2Ips[uri] = hosts
+
+	if self.op.SelectorStrategy == hash.STRATEGY_KETAMA {
+		self.uri2Ips[uri] = hash.NewKetamaStrategy(hosts)
+	} else if self.op.SelectorStrategy == hash.STRATEGY_RANDOM {
+		self.uri2Ips[uri] = hash.NewRandomStrategy(hosts)
+	} else {
+		self.uri2Ips[uri] = hash.NewRandomStrategy(hosts)
+	}
+
 	log.InfoLog("address_manager", "MoaClientManager|Store Uri Pool|SUCC|%s|%d", uri, len(newPool))
 	//清理掉不再使用redisClient
 	usingIps := make(map[string]bool, 5)
 	for _, v := range self.uri2Ips {
-		for _, ip := range v {
+		v.Iterator(func(i int, ip string) {
 			usingIps[ip] = true
-		}
+		})
 	}
 
 	for ip := range self.ip2Options {
@@ -146,18 +155,19 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 }
 
 //根据Uri获取连接
-func (self MoaClientManager) SelectClient(uri string) (*redis.Client, error) {
+func (self MoaClientManager) SelectClient(uri string, key string) (*redis.Client, error) {
 
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	pool, ok := self.uri2Pool[uri]
+	strategy, ok := self.uri2Ips[uri]
 	if ok {
-		p := pool[rand.Intn(len(pool))]
-		return p, nil
-
-	} else {
-		return nil, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))
+		ip := strategy.Select(key)
+		p, yes := self.ip2Client[ip]
+		if yes {
+			return p, nil
+		}
 	}
+	return nil, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))
 
 }
 
