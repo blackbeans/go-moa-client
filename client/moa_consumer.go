@@ -53,8 +53,8 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 	return consumer
 }
 
-func (self MoaConsumer) Destory() {
-	self.clientManager.Destory()
+func (self MoaConsumer) Destroy() {
+	self.clientManager.Destroy()
 }
 
 func (self MoaConsumer) GetService(uri string) interface{} {

@@ -171,7 +171,7 @@ func (self MoaClientManager) SelectClient(uri string, key string) (*redis.Client
 
 }
 
-func (self MoaClientManager) Destory() {
+func (self MoaClientManager) Destroy() {
 	for _, c := range self.ip2Client {
 		c.Close()
 	}
