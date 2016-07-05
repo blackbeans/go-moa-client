@@ -86,7 +86,7 @@ func TestMakeRpcFunc(t *testing.T) {
 	// 暂停一下，不然moa-stat统计打印不出来
 	time.Sleep(time.Second * 2)
 
-	consumer.Destory()
+	consumer.Destroy()
 
 }
 
@@ -112,7 +112,7 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 		}
 	})
 	b.StopTimer()
-	consumer.Destory()
+	consumer.Destroy()
 }
 
 func TestClientChange(t *testing.T) {
@@ -153,7 +153,7 @@ func TestClientChange(t *testing.T) {
 		return
 	}
 
-	consumer.Destory()
+	consumer.Destroy()
 }
 
 func BenchmarkMakeRpcFunc(b *testing.B) {
@@ -175,5 +175,5 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 		// }
 	}
 	b.StopTimer()
-	consumer.Destory()
+	consumer.Destroy()
 }
