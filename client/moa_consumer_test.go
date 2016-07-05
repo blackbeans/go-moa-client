@@ -42,7 +42,7 @@ func init() {
 func TestMakeRpcFunc(t *testing.T) {
 
 	//等待5s注册地址
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{

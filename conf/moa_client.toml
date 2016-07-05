@@ -28,6 +28,8 @@ serviceUriSuffix=""
 		#每个机器的连接数量
 		poolSizePerHost = 5
 		logFile="../conf/log_test.xml"
+		#连接选择方式random或ketama
+		selectorStrategy="ketama"
 	[clusters.online]
 		#env=dev/online
 		env="online" 
@@ -35,4 +37,6 @@ serviceUriSuffix=""
 		#每个机器的连接数量
 		poolSizePerHost = 5
 		logFile="../conf/log_test.xml"
+		#连接选择方式random或ketama
+		selectorStrategy="ketama"
 

@@ -46,7 +46,7 @@ func (self MoaClientCodeC) Read(reader *bufio.Reader) (*bytes.Buffer, error) {
 
 	line, _, err := reader.ReadLine()
 	if nil != err {
-		return nil, errors.New("MoaClientCodeC Read Command Args Count Packet Err " + err.Error())
+		return nil, err
 	}
 	start := bytes.HasPrefix(line, DOLLAR)
 	if start {

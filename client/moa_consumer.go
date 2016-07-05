@@ -133,8 +133,6 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 
 	for _, arg := range in {
 		args = append(args, arg.Interface())
-		buff.WriteString(arg.String())
-
 	}
 	cmd.Params.Args = args
 

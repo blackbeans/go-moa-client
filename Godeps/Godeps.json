@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/blackbeans/go-moa-client",
+	"ImportPath": "go-moa-client",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v73",
 	"Deps": [
