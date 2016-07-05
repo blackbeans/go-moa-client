@@ -3,7 +3,7 @@
 
 #当前使用的环境
 [env]
-appName="moa-demo"
+name="moa-demo"
 appSecretKey="123"
 runMode="dev"
 #可以是momokeeper或者zookeeper

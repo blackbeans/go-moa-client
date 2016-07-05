@@ -21,7 +21,7 @@ type Option struct {
 		RunMode          string
 		BindAddress      string
 		RegistryType     string
-		AppName          string
+		Name             string
 		AppSecretKey     string
 		ServiceUriSuffix string
 	}
@@ -87,7 +87,7 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 	//拼装为可用的MOA参数
 	mop := &ClientOption{}
 	mop.ServiceUriSuffix = option.Env.ServiceUriSuffix
-	mop.AppName = option.Env.AppName
+	mop.AppName = option.Env.Name
 	mop.AppSecretKey = option.Env.AppSecretKey
 	mop.RegistryType = option.Env.RegistryType
 	mop.RegistryHosts = reg.Hosts
