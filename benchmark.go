@@ -37,6 +37,6 @@ func main() {
 	signal.Notify(ch, os.Kill)
 	//kill
 	<-ch
-	app.DestoryApplication()
+	app.DestroyApplication()
 
 }
