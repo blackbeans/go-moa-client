@@ -39,6 +39,29 @@ func init() {
 
 }
 
+func TestNoGroupMakeRpcFunc(t *testing.T) {
+
+	//等待5s注册地址
+	time.Sleep(5 * time.Second)
+
+	consumer := NewMoaConsumer("../conf/moa_client.toml",
+		[]proxy.Service{proxy.Service{
+			ServiceUri: "/service/user-service",
+			Interface:  &UserService{}}})
+	time.Sleep(10 * time.Second)
+	h := consumer.GetService("/service/user-service").(*UserService)
+	a, err := h.GetName("a")
+
+	if nil == err {
+		t.Fail()
+		t.Logf("Oops--------Hello,Buddy|Has Clients|%s|%s\n", a, err)
+	} else {
+		t.Logf("--------Hello,Buddy|No Clients|%s\n", err)
+	}
+	consumer.Destroy()
+
+}
+
 func TestMakeRpcFunc(t *testing.T) {
 
 	//等待5s注册地址
@@ -47,11 +70,13 @@ func TestMakeRpcFunc(t *testing.T) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}},
+			Interface:  &UserService{},
+			GroupId:    "s-mts-group"},
 			proxy.Service{
 				ServiceUri: "/service/user-service-panic",
-				Interface:  &UserService{}}})
-	time.Sleep(2 * time.Second)
+				Interface:  &UserService{},
+				GroupId:    "s-mts-group"}})
+	time.Sleep(10 * time.Second)
 	h := consumer.GetService("/service/user-service").(*UserService)
 	a, err := h.GetName("a")
 	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
@@ -92,10 +117,11 @@ func TestMakeRpcFunc(t *testing.T) {
 
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 	b.StopTimer()
-	consumer = NewMoaConsumer("../conf/moa_client.toml",
+	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}}})
+			Interface:  &UserService{},
+			GroupId:    "s-mts-group"}})
 	time.Sleep(5 * time.Second)
 	h := consumer.GetService("/service/user-service").(*UserService)
 	b.StartTimer()
@@ -121,9 +147,10 @@ func TestClientChange(t *testing.T) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}}})
+			Interface:  &UserService{},
+			GroupId:    "s-mts-group"}})
 
-	succ := consumer.clientManager.addrManager.registry.RegisteService("/service/user-service", "127.0.0.3:1300", "redis")
+	succ := consumer.clientManager.addrManager.registry.RegisteService("/service/user-service", "127.0.0.3:1300", "redis", "s-mts-group")
 	if !succ {
 		t.Fail()
 		return
@@ -140,7 +167,7 @@ func TestClientChange(t *testing.T) {
 
 	t.Log("-----------Remove Node 127.0.0.3:1300")
 
-	succ = consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service", "127.0.0.3:1300", "redis")
+	succ = consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service", "127.0.0.3:1300", "redis", "s-mts-group")
 	if !succ {
 		t.Fail()
 		return
@@ -162,7 +189,8 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
 		[]proxy.Service{proxy.Service{
 			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}}})
+			Interface:  &UserService{},
+			GroupId:    "s-mts-group"}})
 	time.Sleep(5 * time.Second)
 	h := consumer.GetService("/service/user-service").(*UserService)
 	b.StartTimer()

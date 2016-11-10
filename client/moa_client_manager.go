@@ -9,7 +9,6 @@ import (
 	log "github.com/blackbeans/log4go"
 
 	"gopkg.in/redis.v3"
-
 	"strings"
 	"sync"
 	"time"
@@ -43,7 +42,7 @@ func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManag
 		}
 
 	} else if op.RegistryType == REGISTRY_TYPE_ZOOKEEPER {
-		reg = lb.NewZookeeper(op.RegistryHosts, uris)
+		reg = lb.NewZookeeper(op.RegistryHosts, uris, false)
 	}
 
 	manager := &MoaClientManager{}
@@ -89,7 +88,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		//创建redis的实例
 		c := redis.NewClient(op)
 		addOp2Clients[op] = c
-		log.InfoLog("address_manager", "MoaClientManager|Create Client|SUCC|%s", hp)
+		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
 	}
 
 	//开始执行新增连接和删除操作
@@ -101,7 +100,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 		self.ip2Options[op.Addr] = op
 
-		log.InfoLog("address_manager", "MoaClientManager|Store Client|SUCC|%s", op.Addr)
+		log.InfoLog("config_center", "MoaClientManager|Store Client|SUCC|%s", op.Addr)
 	}
 
 	//重新构建uri对应的连接组
@@ -123,7 +122,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		self.uri2Ips[uri] = hash.NewRandomStrategy(hosts)
 	}
 
-	log.InfoLog("address_manager", "MoaClientManager|Store Uri Pool|SUCC|%s|%d", uri, len(newPool))
+	log.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v|%d", uri, hosts, len(newPool))
 	//清理掉不再使用redisClient
 	usingIps := make(map[string]bool, 5)
 	for _, v := range self.uri2Ips {
@@ -145,13 +144,13 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		c, ok := self.ip2Client[hp]
 		if ok {
 			c.Close()
-			log.WarnLog("address_manager", "MoaClientManager|Remove Expired Client|%s", hp)
+			log.WarnLog("config_center", "MoaClientManager|Remove Expired Client|%s", hp)
 		}
 		delete(self.ip2Client, hp)
 	}
 	self.lock.Unlock()
 
-	log.InfoLog("address_manager", "MoaClientManager|OnAddressChange|SUCC|%s|%v", uri, hosts)
+	log.InfoLog("config_center", "MoaClientManager|OnAddressChange|SUCC|%s|%v", uri, hosts)
 }
 
 //根据Uri获取连接
@@ -159,6 +158,7 @@ func (self MoaClientManager) SelectClient(uri string, key string) (*redis.Client
 
 	self.lock.RLock()
 	defer self.lock.RUnlock()
+
 	strategy, ok := self.uri2Ips[uri]
 	if ok {
 		ip := strategy.Select(key)

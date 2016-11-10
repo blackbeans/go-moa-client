@@ -18,12 +18,11 @@ type HostPort struct {
 //配置信息
 type Option struct {
 	Env struct {
-		RunMode          string
-		BindAddress      string
-		RegistryType     string
-		Name             string
-		AppSecretKey     string
-		ServiceUriSuffix string
+		RunMode      string
+		BindAddress  string
+		RegistryType string
+		Name         string
+		AppSecretKey string
 	}
 
 	//使用的环境
@@ -49,7 +48,6 @@ type ClientOption struct {
 	RegistryHosts    string
 	ProcessTimeout   time.Duration
 	PoolSizePerHost  int
-	ServiceUriSuffix string
 	SelectorStrategy hash.StrategyType
 }
 
@@ -86,7 +84,6 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 
 	//拼装为可用的MOA参数
 	mop := &ClientOption{}
-	mop.ServiceUriSuffix = option.Env.ServiceUriSuffix
 	mop.AppName = option.Env.Name
 	mop.AppSecretKey = option.Env.AppSecretKey
 	mop.RegistryType = option.Env.RegistryType

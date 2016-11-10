@@ -8,8 +8,8 @@ runMode="dev"
 bindAddress="^10\\.83\\.\\d+\\.\\d+$:13000"
 #可以是momokeeper或者zookeeper
 registryType="zookeeper"
-#service Uri的后缀可以为空
-serviceUriSuffix="" 
+#groupId 标识服务所属集群
+groupId="s-mts-group" 
 
 #registry的管理	
 [registry]

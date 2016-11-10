@@ -55,9 +55,10 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 	hosts := make(map[string][]string, 2)
 	for _, uri := range self.serviceUris {
 		for i := 0; i < 3; i++ {
-			addrs, err := self.registry.GetService(uri, PROTOCOL_TYPE)
+			serviceUri, groupId := splitServiceUri(uri)
+			addrs, err := self.registry.GetService(serviceUri, PROTOCOL_TYPE, groupId)
 			if nil != err {
-				log.WarnLog("address_manager", "AddressManager|loadAvaiableAddress|FAIL|%s|%s", err, uri)
+				log.WarnLog("config_center", "AddressManager|loadAvaiableAddress|FAIL|%s|%s", err, uri)
 				func() {
 					self.lock.RLock()
 					defer self.lock.RUnlock()
@@ -70,7 +71,7 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 				if len(addrs) > 0 {
 					sort.Strings(addrs)
 					hosts[uri] = addrs
-					log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|Pull Address|%s|%s", uri, addrs)
+					log.InfoLog("config_center", "AddressManager|loadAvaiableAddress|Pull Address|%s|%s", uri, addrs)
 				}
 				//对比变化
 				func() {
@@ -99,7 +100,7 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 					} else {
 						needChange = true
 					}
-					log.InfoLog("address_manager", "AddressManager|loadAvaiableAddress|NeedChange %v|%s|%s", needChange, uri, addrs)
+					log.InfoLog("config_center", "AddressManager|loadAvaiableAddress|NeedChange %v|%s|%s", needChange, uri, addrs)
 					//变化通知
 					if needChange {
 						self.listener(uri, addrs)

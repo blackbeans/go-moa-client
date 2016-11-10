@@ -16,6 +16,7 @@ import (
 
 type MoaConsumer struct {
 	services      map[string]proxy.Service
+	uri2GroupUri  map[string]string
 	options       *option.ClientOption
 	clientManager *MoaClientManager
 	buffPool      *sync.Pool
@@ -28,17 +29,19 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 		panic(err)
 	}
 
+	uri2GroupUri := make(map[string]string, 5)
 	services := make(map[string]proxy.Service, 2)
 	consumer := &MoaConsumer{}
 	uris := make([]string, 0, 2)
 	for _, s := range ps {
-		uri := s.ServiceUri + options.ServiceUriSuffix
-		s.ServiceUri = uri
-		services[uri] = s
+		services[s.ServiceUri] = s
+		uri := buildServiceUri(s.ServiceUri, s.GroupId)
+		uri2GroupUri[s.ServiceUri] = uri
 		uris = append(uris, uri)
 	}
 	consumer.services = services
 	consumer.options = options
+	consumer.uri2GroupUri = uri2GroupUri
 	consumer.clientManager = NewMoaClientManager(options, uris)
 	pool := &sync.Pool{}
 	pool.New = func() interface{} {
@@ -51,6 +54,23 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 		consumer.makeRpcFunc(s)
 	}
 	return consumer
+}
+
+func buildServiceUri(serviceUri, groupId string) string {
+	if len(groupId) > 0 && "*" != groupId {
+		return fmt.Sprintf("%s#%s", serviceUri, groupId)
+	} else {
+		return serviceUri
+	}
+}
+
+func splitServiceUri(serviceUri string) (uri, groupId string) {
+	if strings.IndexAny(serviceUri, "#") >= 0 {
+		split := strings.SplitN(serviceUri, "#", 2)
+		return split[0], split[1]
+	} else {
+		return serviceUri, "*"
+	}
 }
 
 func (self MoaConsumer) Destroy() {
@@ -137,11 +157,12 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	cmd.Params.Args = args
 
 	//2.选取服务地址
-	c, err := self.clientManager.SelectClient(s.ServiceUri, buff.String())
-	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, s.ServiceUri)
+	serviceUri := self.uri2GroupUri[s.ServiceUri]
+	c, err := self.clientManager.SelectClient(serviceUri, buff.String())
+	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, serviceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
-			err, s.ServiceUri)
+			err, serviceUri)
 		return errFunc(&err)
 
 	}
@@ -164,9 +185,9 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 
 	var resp protocol.MoaRawRespPacket
 	err = json.Unmarshal([]byte(result), &resp)
-	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", s.ServiceUri, method, string(result.([]byte)))
+	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", serviceUri, method, string(result.([]byte)))
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", s.ServiceUri, method, result)
+		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", serviceUri, method, result)
 		return errFunc(&err)
 	}
 

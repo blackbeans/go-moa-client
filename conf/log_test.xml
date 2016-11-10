@@ -89,10 +89,10 @@
     <property name="daily">true</property> 
   </filter>
     <filter enabled="true">
-    <tag>address_manager</tag>
+    <tag>config_center</tag>
     <type>file</type>
     <level>INFO</level>
-    <property name="filename">./logs/address_manager.log</property>
+    <property name="filename">./logs/config_center.log</property>
     <property name="format">[%D %T] [%L] (%S) %M</property>
     <property name="rotate">true</property>
     <property name="maxsize">100M</property>
