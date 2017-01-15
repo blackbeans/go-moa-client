@@ -1,11 +1,8 @@
 package client
 
 import (
-	"github.com/blackbeans/go-moa/proxy"
-	// "runtime"
-
 	"github.com/blackbeans/go-moa/core"
-	// "sync"
+
 	"testing"
 	"time"
 )
@@ -17,21 +14,21 @@ func init() {
 	demo := Demo{make(map[string][]string, 2), "/service/lookup"}
 	inter := (*IHello)(nil)
 	uinter := (*IUserService)(nil)
-	core.NewApplcation("../conf/moa_server.toml", func() []proxy.Service {
-		return []proxy.Service{
-			proxy.Service{
+	core.NewApplcation("../conf/moa_server.toml", func() []core.Service {
+		return []core.Service{
+			core.Service{
 				ServiceUri: "/service/lookup",
 				Instance:   demo,
 				Interface:  inter},
-			proxy.Service{
+			core.Service{
 				ServiceUri: "/service/moa-admin",
 				Instance:   demo,
 				Interface:  inter},
-			proxy.Service{
+			core.Service{
 				ServiceUri: "/service/user-service",
 				Instance:   UserServiceDemo{},
 				Interface:  uinter},
-			proxy.Service{
+			core.Service{
 				ServiceUri: "/service/user-service-panic",
 				Instance:   UserServicePanic{},
 				Interface:  uinter}}
@@ -45,18 +42,19 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
+		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
-	time.Sleep(10 * time.Second)
-	h := consumer.GetService("/service/user-service").(*UserService)
+	time.Sleep(5 * time.Second)
+	s, _ := consumer.GetService("/service/user-service")
+	h := s.(*UserService)
 	a, err := h.GetName("a")
 
-	if nil == err {
-		t.Fail()
-		t.Logf("Oops--------Hello,Buddy|Has Clients|%s|%s\n", a, err)
-	} else {
+	if nil != err {
 		t.Logf("--------Hello,Buddy|No Clients|%s\n", err)
+		t.FailNow()
+	} else {
+		t.Logf("Oops--------Hello,Buddy|Has Clients|%s|%v\n", a, err)
 	}
 	consumer.Destroy()
 
@@ -68,16 +66,17 @@ func TestMakeRpcFunc(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
+		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{},
-			GroupId:    "s-mts-group"},
-			proxy.Service{
+			GroupIds:   []string{"s-mts-group"}},
+			Service{
 				ServiceUri: "/service/user-service-panic",
 				Interface:  &UserService{},
-				GroupId:    "s-mts-group"}})
+				GroupIds:   []string{"s-mts-group"}}})
 	time.Sleep(10 * time.Second)
-	h := consumer.GetService("/service/user-service").(*UserService)
+	s, _ := consumer.GetService("/service/user-service")
+	h := s.(*UserService)
 	a, err := h.GetName("a")
 	t.Logf("--------Hello,Buddy|%s|%s\n", a, err)
 	if nil != err || a.Uri != "/service/user-service" {
@@ -99,7 +98,8 @@ func TestMakeRpcFunc(t *testing.T) {
 		t.Fail()
 	}
 
-	h = consumer.GetService("/service/user-service-panic").(*UserService)
+	s, _ = consumer.GetService("/service/user-service-panic")
+	h = s.(*UserService)
 	a, err = h.GetName("a")
 	t.Logf("--------Hello,Buddy|%s|error(%s)\n", a, err)
 	if nil == err || nil != a {
@@ -118,12 +118,13 @@ func TestMakeRpcFunc(t *testing.T) {
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 	b.StopTimer()
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
+		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{},
-			GroupId:    "s-mts-group"}})
+			GroupIds:   []string{"s-mts-group"}}})
 	time.Sleep(5 * time.Second)
-	h := consumer.GetService("/service/user-service").(*UserService)
+	s, _ := consumer.GetService("/service/user-service")
+	h := s.(*UserService)
 	b.StartTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -145,10 +146,10 @@ func TestClientChange(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
+		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{},
-			GroupId:    "s-mts-group"}})
+			GroupIds:   []string{"s-mts-group"}}})
 
 	succ := consumer.clientManager.addrManager.registry.RegisteService("/service/user-service", "127.0.0.3:1300", "redis", "s-mts-group")
 	if !succ {
@@ -187,12 +188,13 @@ func BenchmarkMakeRpcFunc(b *testing.B) {
 
 	b.StopTimer()
 	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]proxy.Service{proxy.Service{
+		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{},
-			GroupId:    "s-mts-group"}})
+			GroupIds:   []string{"s-mts-group"}}})
 	time.Sleep(5 * time.Second)
-	h := consumer.GetService("/service/user-service").(*UserService)
+	s, _ := consumer.GetService("/service/user-service")
+	h := s.(*UserService)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		h.GetName("a")

@@ -29,7 +29,6 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 		registry: registry, uri2Hosts: uri2Hosts, listener: listener}
 	hosts := center.loadAvaiableAddress()
 	center.uri2Hosts = hosts
-
 	go func() {
 		for {
 			time.Sleep(5 * time.Second)
@@ -71,7 +70,6 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 				if len(addrs) > 0 {
 					sort.Strings(addrs)
 					hosts[uri] = addrs
-					log.InfoLog("config_center", "AddressManager|loadAvaiableAddress|Pull Address|%s|%s", uri, addrs)
 				}
 				//对比变化
 				func() {
@@ -100,9 +98,13 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 					} else {
 						needChange = true
 					}
-					log.InfoLog("config_center", "AddressManager|loadAvaiableAddress|NeedChange %v|%s|%s", needChange, uri, addrs)
+
+					log.InfoLog("config_center",
+						"AddressManager|loadAvaiableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
 					//变化通知
 					if needChange {
+						log.InfoLog("config_center",
+							"AddressManager|loadAvaiableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
 						self.listener(uri, addrs)
 
 					}

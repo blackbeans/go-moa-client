@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/blackbeans/go-moa-client/client/hash"
-	"github.com/blackbeans/go-moa-client/option"
+	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
 	log "github.com/blackbeans/log4go"
-
-	"gopkg.in/redis.v3"
+	"gopkg.in/redis.v5"
 	"strings"
 	"sync"
 	"time"
@@ -22,27 +21,14 @@ type MoaClientManager struct {
 	uri2Ips map[string] /*uri*/ hash.Strategy
 
 	addrManager *AddressManager
-	op          *option.ClientOption
+	op          *ClientOption
 	lock        sync.RWMutex
 }
 
-const (
-	REGISTRY_TYPE_MOMOKEEPER = "momokeeper"
-	REGISTRY_TYPE_ZOOKEEPER  = "zookeeper"
-)
-
-func NewMoaClientManager(op *option.ClientOption, uris []string) *MoaClientManager {
+func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 	var reg lb.IRegistry
-	if op.RegistryType == REGISTRY_TYPE_MOMOKEEPER {
-		split := strings.Split(op.RegistryHosts, ",")
-		if len(split) > 1 {
-			reg = lb.NewMomokeeper(split[0], split[1])
-		} else {
-			reg = lb.NewMomokeeper(split[0], split[0])
-		}
-
-	} else if op.RegistryType == REGISTRY_TYPE_ZOOKEEPER {
-		reg = lb.NewZookeeper(op.RegistryHosts, uris, false)
+	if strings.HasPrefix(op.RegistryHosts, core.SCHEMA_ZK) {
+		reg = lb.NewZkRegistry(strings.TrimPrefix(op.RegistryHosts, core.SCHEMA_ZK), uris, false)
 	}
 
 	manager := &MoaClientManager{}

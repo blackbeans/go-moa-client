@@ -1,4 +1,4 @@
-package option
+package client
 
 import (
 	"errors"
@@ -20,7 +20,6 @@ type Option struct {
 	Env struct {
 		RunMode      string
 		BindAddress  string
-		RegistryType string
 		Name         string
 		AppSecretKey string
 	}
@@ -44,7 +43,6 @@ type Cluster struct {
 type ClientOption struct {
 	AppName          string
 	AppSecretKey     string
-	RegistryType     string
 	RegistryHosts    string
 	ProcessTimeout   time.Duration
 	PoolSizePerHost  int
@@ -86,7 +84,6 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 	mop := &ClientOption{}
 	mop.AppName = option.Env.Name
 	mop.AppSecretKey = option.Env.AppSecretKey
-	mop.RegistryType = option.Env.RegistryType
 	mop.RegistryHosts = reg.Hosts
 	mop.ProcessTimeout = time.Duration(int64(cluster.ProcessTimeout) * int64(time.Second))
 	mop.PoolSizePerHost = cluster.PoolSizePerHost

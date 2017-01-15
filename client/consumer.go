@@ -5,43 +5,64 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/blackbeans/go-moa-client/option"
-	"github.com/blackbeans/go-moa/protocol"
-	"github.com/blackbeans/go-moa/proxy"
+	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa/proto"
 	log "github.com/blackbeans/log4go"
 	"reflect"
 	"strings"
 	"sync"
 )
 
+type Service struct {
+	ServiceUri string                       //serviceUr对应的服务名称
+	GroupIds   []string                     //该服务的分组
+	group2Uri  map[string] /*group*/ string //compose uri
+	Interface  interface{}
+}
+
 type MoaConsumer struct {
-	services      map[string]proxy.Service
-	uri2GroupUri  map[string]string
-	options       *option.ClientOption
+	services      map[string]core.Service
+	options       *ClientOption
 	clientManager *MoaClientManager
 	buffPool      *sync.Pool
 }
 
-func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
+func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 
-	options, err := option.LoadConfiruation(confPath)
+	options, err := LoadConfiruation(confPath)
 	if nil != err {
 		panic(err)
 	}
 
-	uri2GroupUri := make(map[string]string, 5)
-	services := make(map[string]proxy.Service, 2)
+	services := make(map[string]core.Service, 2)
 	consumer := &MoaConsumer{}
-	uris := make([]string, 0, 2)
+	globalUnique := make(map[string]*interface{}, 10)
 	for _, s := range ps {
-		services[s.ServiceUri] = s
-		uri := buildServiceUri(s.ServiceUri, s.GroupId)
-		uri2GroupUri[s.ServiceUri] = uri
+		s.GroupIds = append(s.GroupIds, "*")
+		for _, g := range s.GroupIds {
+			//全部转为指针类型的
+			instType := reflect.TypeOf(s.Interface)
+			if instType.Kind() == reflect.Ptr {
+				instType = instType.Elem()
+			}
+			clone := reflect.New(instType).Interface()
+			uri := BuildServiceUri(s.ServiceUri, g)
+			services[uri] = core.Service{
+				ServiceUri: s.ServiceUri,
+				GroupId:    g,
+				Interface:  clone}
+			globalUnique[uri] = nil
+		}
+
+	}
+
+	//去重
+	uris := make([]string, 0, len(globalUnique))
+	for uri := range globalUnique {
 		uris = append(uris, uri)
 	}
 	consumer.services = services
 	consumer.options = options
-	consumer.uri2GroupUri = uri2GroupUri
 	consumer.clientManager = NewMoaClientManager(options, uris)
 	pool := &sync.Pool{}
 	pool.New = func() interface{} {
@@ -50,15 +71,15 @@ func NewMoaConsumer(confPath string, ps []proxy.Service) *MoaConsumer {
 	consumer.buffPool = pool
 
 	//添加代理
-	for _, s := range ps {
+	for _, s := range services {
 		consumer.makeRpcFunc(s)
 	}
 	return consumer
 }
 
-func buildServiceUri(serviceUri, groupId string) string {
-	if len(groupId) > 0 && "*" != groupId {
-		return fmt.Sprintf("%s#%s", serviceUri, groupId)
+func BuildServiceUri(serviceUri string, groupid string) string {
+	if len(groupid) > 0 && "*" != groupid {
+		return fmt.Sprintf("%s#%s", serviceUri, groupid)
 	} else {
 		return serviceUri
 	}
@@ -73,15 +94,32 @@ func splitServiceUri(serviceUri string) (uri, groupId string) {
 	}
 }
 
-func (self MoaConsumer) Destroy() {
+func (self *MoaConsumer) Destroy() {
 	self.clientManager.Destroy()
 }
 
-func (self MoaConsumer) GetService(uri string) interface{} {
-	return self.services[uri].Interface
+var ERR_NO_SERVICE = errors.New("No Exist Service ")
+
+func (self *MoaConsumer) GetService(uri string) (interface{}, error) {
+	proxy, ok := self.services[uri]
+	if ok {
+		return proxy.Interface, nil
+	} else {
+		return nil, ERR_NO_SERVICE
+	}
 }
 
-func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
+func (self *MoaConsumer) GetServiceWithGroupid(uri, groupid string) (interface{}, error) {
+	proxy, ok := self.services[BuildServiceUri(uri, groupid)]
+	if ok {
+		return proxy.Interface, nil
+	} else {
+		return nil, ERR_NO_SERVICE
+	}
+}
+
+func (self *MoaConsumer) makeRpcFunc(s core.Service) {
+
 	elem := reflect.ValueOf(s.Interface)
 	obj := elem.Elem()
 	numf := obj.NumField()
@@ -99,16 +137,14 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 				outType = append(outType, t.Out(idx))
 			}
 			if !outType[len(outType)-1].Implements(errorType) {
-				panic(errors.New(
-					fmt.Sprintf("%s Method  %s Last Return Type Must Be An Error! [%s]",
-						s.ServiceUri, name, outType[len(outType)-1].String())))
+				panic(fmt.Errorf("%s Method  %s Last Return Type Must Be An Error! [%s]",
+					s.ServiceUri, name, outType[len(outType)-1].String()))
 			}
 		} else {
-			panic(errors.New(
-				fmt.Sprintf("%s Method  %s Last Return Type Must Be More Than An Error!", s.ServiceUri, name)))
+			panic(fmt.Errorf("%s Method  %s Last Return Type Must Be More Than An Error!", s.ServiceUri, name))
 		}
 
-		f := func(s proxy.Service, methodName string,
+		f := func(s core.Service, methodName string,
 			outType []reflect.Type) func(in []reflect.Value) []reflect.Value {
 			return func(in []reflect.Value) []reflect.Value {
 				vals := self.rpcInvoke(s, methodName, in, outType)
@@ -117,13 +153,14 @@ func (self MoaConsumer) makeRpcFunc(s proxy.Service) {
 		}(s, name, outType)
 		v := reflect.MakeFunc(t, f)
 		method.Set(v)
+		log.InfoLog("moa_client", "MoaConsumer|makeRpcFunc|SUCC|%s->%s", s)
 	}
 }
 
 var errorType = reflect.TypeOf(make([]error, 1)).Elem()
 
 //真正发起RPC调用的逻辑
-func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
+func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	in []reflect.Value, outType []reflect.Type) []reflect.Value {
 
 	errFunc := func(err *error) []reflect.Value {
@@ -140,7 +177,7 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	}
 
 	//1.组装请求协议
-	cmd := protocol.MoaReqPacket{}
+	cmd := proto.MoaReqPacket{}
 	cmd.ServiceUri = s.ServiceUri
 	cmd.Params.Method = method
 	args := make([]interface{}, 0, 3)
@@ -157,9 +194,8 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	cmd.Params.Args = args
 
 	//2.选取服务地址
-	serviceUri := self.uri2GroupUri[s.ServiceUri]
+	serviceUri := s.ServiceUri
 	c, err := self.clientManager.SelectClient(serviceUri, buff.String())
-	// fmt.Printf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s\n", err, serviceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
@@ -169,7 +205,6 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 
 	//3.发送网络请求
 	data, err := json.Marshal(cmd)
-	//fmt.Printf("MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s|%s\n", err, cmd)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
 		return errFunc(&err)
@@ -183,9 +218,9 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 		return errFunc(&err)
 	}
 
-	var resp protocol.MoaRawRespPacket
+	var resp proto.MoaRawRespPacket
 	err = json.Unmarshal([]byte(result), &resp)
-	//fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", serviceUri, method, string(result.([]byte)))
+	fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", serviceUri, method, result)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", serviceUri, method, result)
 		return errFunc(&err)
@@ -200,9 +235,16 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 	}
 
 	//执行成功
-	if resp.ErrCode == protocol.CODE_SERVER_SUCC {
+	if resp.ErrCode == proto.CODE_SERVER_SUCC {
+		var respErr reflect.Value
+		if len(resp.Message) > 0 {
+			//好恶心的写法
+			createErr := errors.New(resp.Message)
+			respErr = reflect.ValueOf(&createErr).Elem()
+		} else {
+			respErr = reflect.Zero(errorType)
+		}
 		if nil != resultType {
-
 			//可能是对象类型则需要序列化为该对象
 			inst := reflect.New(resultType)
 			if len(data) > 0 {
@@ -211,10 +253,10 @@ func (self MoaConsumer) rpcInvoke(s proxy.Service, method string,
 					return errFunc(&uerr)
 				}
 			}
-			return []reflect.Value{inst.Elem(), reflect.Zero(errorType)}
+			return []reflect.Value{inst.Elem(), respErr}
 		} else {
 			//只有error的情况,没有错误返回成功
-			return []reflect.Value{reflect.Zero(errorType)}
+			return []reflect.Value{respErr}
 		}
 	} else {
 		//invoke Fail

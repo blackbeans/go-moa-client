@@ -5,18 +5,18 @@
 [env]
 name="moa-demo"
 runMode="dev"
-bindAddress="^10\\.83\\.\\d+\\.\\d+$:13000"
-#可以是momokeeper或者zookeeper
-registryType="zookeeper"
+#bindAddress="^10\\.83\\.\\d+\\.\\d+$:13000"
+bindAddress=":13000"
+
 #groupId 标识服务所属集群
-groupId="s-mts-group" 
+groupId="*" 
 
 #registry的管理	
 [registry]
 	[registry.dev]
-		hosts="localhost:2181"
+		hosts="zk://localhost:2181"
 	[registry.online]
-		hosts="vm-bibi-zk-mq001.vm:2181,vm-bibi-zk-mq002.vm:2181,vm-bibi-zk-mq003.vm:2181" 
+		hosts="zk://vm-bibi-zk-mq001.vm:2181,vm-bibi-zk-mq002.vm:2181,vm-bibi-zk-mq003.vm:2181" 
 
 #cluster的服务器
 [clusters]

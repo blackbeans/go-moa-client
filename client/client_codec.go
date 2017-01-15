@@ -6,7 +6,7 @@ import (
 	b "encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/blackbeans/go-moa/protocol"
+	"github.com/blackbeans/go-moa/proto"
 	"github.com/blackbeans/turbo/packet"
 	"strconv"
 )
@@ -38,7 +38,7 @@ func init() {
 }
 
 type MoaClientCodeC struct {
-	protocol.RedisGetCodec
+	proto.RedisGetCodec
 }
 
 //直接获取data
@@ -131,6 +131,6 @@ func (self MoaClientCodeC) MarshalPacket(p *packet.Packet) []byte {
 	case CMD_PING:
 		return p.Data
 	default:
-		panic(fmt.Sprintf("UnSupport Redis Protocol %d", p.Header.CmdType))
+		panic(fmt.Sprintf("UnSupport Redis proto %d", p.Header.CmdType))
 	}
 }

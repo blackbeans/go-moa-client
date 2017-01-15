@@ -85,7 +85,7 @@ func (self UserServiceDemo) Pong() (string, error) {
 type UserServicePanic struct{}
 
 func (self UserServicePanic) GetName(name string) (*DemoResult, error) {
-	panic(errors.New("GetName invoke fail"))
+	return nil, errors.New("真的抛错了")
 }
 
 func (self UserServicePanic) SetName(name string) error {
