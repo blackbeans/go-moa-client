@@ -250,20 +250,12 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 		if nil != resultType {
 			//可能是对象类型则需要序列化为该对象
-			var inst reflect.Value
-			k := resultType.Kind()
-			switch k {
-			case reflect.String:
-				inst = reflect.ValueOf(string(resp.Result))
-				return []reflect.Value{inst, respErr}
-			default:
-				inst = reflect.New(resultType)
-				uerr := json.Unmarshal(resp.Result, inst.Interface())
-				if nil != uerr {
-					return errFunc(uerr)
-				}
-				return []reflect.Value{inst.Elem(), respErr}
+			inst := reflect.New(resultType)
+			uerr := json.Unmarshal(resp.Result, inst.Interface())
+			if nil != uerr {
+				return errFunc(uerr)
 			}
+			return []reflect.Value{inst.Elem(), respErr}
 
 		} else {
 			//只有error的情况,没有错误返回成功
