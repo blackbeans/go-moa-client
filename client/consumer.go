@@ -49,7 +49,7 @@ func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 			clone := reflect.New(instType).Interface()
 			uri := BuildServiceUri(s.ServiceUri, g)
 			services[uri] = core.Service{
-				ServiceUri: uri,
+				ServiceUri: s.ServiceUri,
 				GroupId:    g,
 				Interface:  clone}
 			globalUnique[uri] = nil
@@ -195,7 +195,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	cmd.Params.Args = args
 
 	//2.选取服务地址
-	serviceUri := s.ServiceUri
+	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
 	c, err := self.clientManager.SelectClient(serviceUri, buff.String())
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",

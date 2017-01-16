@@ -1,11 +1,12 @@
 package client
 
 import (
-	"github.com/blackbeans/go-moa/lb"
-	log "github.com/blackbeans/log4go"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/blackbeans/go-moa/lb"
+	log "github.com/blackbeans/log4go"
 )
 
 const (
@@ -99,8 +100,6 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 						needChange = true
 					}
 
-					log.InfoLog("config_center",
-						"AddressManager|loadAvaiableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
 					//变化通知
 					if needChange {
 						log.InfoLog("config_center",
