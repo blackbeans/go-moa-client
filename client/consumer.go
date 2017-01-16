@@ -221,7 +221,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	var resp proto.MoaRawRespPacket
 	err = json.Unmarshal([]byte(result), &resp)
-	fmt.Printf("MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s\n", serviceUri, method, result)
+
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", serviceUri, method, result)
 		return errFunc(&err)
