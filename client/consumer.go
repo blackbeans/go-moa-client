@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/go-moa/proto"
-	log "github.com/blackbeans/log4go"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa/proto"
+	log "github.com/blackbeans/log4go"
 )
 
 type Service struct {
@@ -48,7 +49,7 @@ func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 			clone := reflect.New(instType).Interface()
 			uri := BuildServiceUri(s.ServiceUri, g)
 			services[uri] = core.Service{
-				ServiceUri: s.ServiceUri,
+				ServiceUri: uri,
 				GroupId:    g,
 				Interface:  clone}
 			globalUnique[uri] = nil
