@@ -102,6 +102,7 @@ func (self *MoaConsumer) Destroy() {
 var ERR_NO_SERVICE = errors.New("No Exist Service ")
 
 func (self *MoaConsumer) GetService(uri string) (interface{}, error) {
+
 	proxy, ok := self.services[uri]
 	if ok {
 		return proxy.Interface, nil
@@ -164,11 +165,11 @@ var errorType = reflect.TypeOf(make([]error, 1)).Elem()
 func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	in []reflect.Value, outType []reflect.Type) []reflect.Value {
 
-	errFunc := func(err *error) []reflect.Value {
+	errFunc := func(err error) []reflect.Value {
 		retVal := make([]reflect.Value, 0, len(outType))
 		for _, t := range outType {
 			if t.Implements(errorType) {
-				retVal = append(retVal, reflect.ValueOf(err).Elem())
+				retVal = append(retVal, reflect.ValueOf(&err).Elem())
 			} else {
 				retVal = append(retVal, reflect.New(t).Elem())
 			}
@@ -200,7 +201,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
-		return errFunc(&err)
+		return errFunc(err)
 
 	}
 
@@ -208,15 +209,16 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	data, err := json.Marshal(cmd)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
-		return errFunc(&err)
+		return errFunc(err)
 	}
+
 	//4.等待响应、超时、异常处理
 	result, err := c.Get(string(data)).Result()
 	//5.返回调用结果
 	if nil != err {
 		//response error and close this connection
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s", err, cmd)
-		return errFunc(&err)
+		return errFunc(err)
 	}
 
 	var resp proto.MoaRawRespPacket
@@ -224,7 +226,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", serviceUri, method, result)
-		return errFunc(&err)
+		return errFunc(err)
 	}
 
 	//获取非Error的返回类型
@@ -245,16 +247,24 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		} else {
 			respErr = reflect.Zero(errorType)
 		}
+
 		if nil != resultType {
 			//可能是对象类型则需要序列化为该对象
-			inst := reflect.New(resultType)
-			if len(data) > 0 {
+			var inst reflect.Value
+			k := resultType.Kind()
+			switch k {
+			case reflect.String:
+				inst = reflect.ValueOf(string(resp.Result))
+				return []reflect.Value{inst, respErr}
+			default:
+				inst = reflect.New(resultType)
 				uerr := json.Unmarshal(resp.Result, inst.Interface())
 				if nil != uerr {
-					return errFunc(&uerr)
+					return errFunc(uerr)
 				}
+				return []reflect.Value{inst.Elem(), respErr}
 			}
-			return []reflect.Value{inst.Elem(), respErr}
+
 		} else {
 			//只有error的情况,没有错误返回成功
 			return []reflect.Value{respErr}
@@ -265,6 +275,6 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 			"MoaConsumer|rpcInvoke|RPC FAIL|%s|%s|%s",
 			s.ServiceUri, method, resp)
 		err = errors.New(resp.Message)
-		return errFunc(&err)
+		return errFunc(err)
 	}
 }

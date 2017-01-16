@@ -2,7 +2,6 @@ package client
 
 import (
 	"github.com/blackbeans/go-moa/core"
-
 	"testing"
 	"time"
 )
@@ -11,19 +10,9 @@ var consumer *MoaConsumer
 
 func init() {
 
-	demo := Demo{make(map[string][]string, 2), "/service/lookup"}
-	inter := (*IHello)(nil)
 	uinter := (*IUserService)(nil)
 	core.NewApplcation("../conf/moa_server.toml", func() []core.Service {
 		return []core.Service{
-			core.Service{
-				ServiceUri: "/service/lookup",
-				Instance:   demo,
-				Interface:  inter},
-			core.Service{
-				ServiceUri: "/service/moa-admin",
-				Instance:   demo,
-				Interface:  inter},
 			core.Service{
 				ServiceUri: "/service/user-service",
 				Instance:   UserServiceDemo{},
@@ -92,8 +81,8 @@ func TestMakeRpcFunc(t *testing.T) {
 		t.Fail()
 	}
 
-	_, err = h.Pong()
-	t.Logf("--------Pong|%s\n", err)
+	pong, err := h.Pong()
+	t.Logf("--------Pong|%v|%s\n", err, pong)
 	if nil != err {
 		t.Fail()
 	}
