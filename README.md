@@ -65,5 +65,7 @@
 
     redis-benchmark -h host -p 13000 -n 1000000 -c 100 get '{"action":"/service/bibi/go-moa","params":{"m":"setName","args":["a"]}}'
 
+    redis-cli -h 10.26.27.99 -p 9095 get '{"action":"/service/snowflake-service","params":{"m":"NextId","args":[]}}'
+
 
 

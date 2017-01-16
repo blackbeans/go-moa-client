@@ -208,7 +208,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	//3.发送网络请求
 	data, err := json.Marshal(cmd)
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Marshal|FAIL|%s|%s", err, cmd)
+		log.ErrorLog("moa_client", "MoaConsumer|MarshalRequest|FAIL|%s|%s", err, cmd)
 		return errFunc(err)
 	}
 
@@ -217,7 +217,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	//5.返回调用结果
 	if nil != err {
 		//response error and close this connection
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|InvokeFail|%s|%s", err, cmd)
+		log.ErrorLog("moa_client", "MoaConsumer|InvokeFail|%s|%s", err, cmd)
 		return errFunc(err)
 	}
 
@@ -225,7 +225,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	err = json.Unmarshal([]byte(result), &resp)
 
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|Return Type Not Match|%s|%s|%s", serviceUri, method, result)
+		log.ErrorLog("moa_client", "MoaConsumer|UnmarshalResponse|%v|%s|%s|%s", err, serviceUri, method, result)
 		return errFunc(err)
 	}
 
@@ -272,7 +272,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	} else {
 		//invoke Fail
 		log.ErrorLog("moa_client",
-			"MoaConsumer|rpcInvoke|RPC FAIL|%s|%s|%s",
+			"MoaConsumer|RPC FAIL|%s|%s|%s",
 			s.ServiceUri, method, resp)
 		err = errors.New(resp.Message)
 		return errFunc(err)
