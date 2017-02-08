@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/go-moa/proxy"
 	"os"
 	"os/signal"
 )
@@ -24,9 +23,9 @@ func (self GoMoaDemo) Ping() error {
 }
 
 func main() {
-	app := core.NewApplcation("conf/moa_server.toml", func() []proxy.Service {
-		return []proxy.Service{
-			proxy.Service{
+	app := core.NewApplcation("conf/moa_server.toml", func() []core.Service {
+		return []core.Service{
+			core.Service{
 				ServiceUri: "/service/bibi/go-moa",
 				Instance:   GoMoaDemo{},
 				Interface:  (*IGoMoaDemo)(nil)}}
