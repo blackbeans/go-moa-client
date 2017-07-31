@@ -1,9 +1,10 @@
 package client
 
 import (
-	"github.com/blackbeans/go-moa/core"
 	"testing"
 	"time"
+
+	"github.com/blackbeans/go-moa/core"
 )
 
 var consumer *MoaConsumer
@@ -148,8 +149,8 @@ func TestClientChange(t *testing.T) {
 	t.Logf("RegisteService|SUCC|%s", "127.0.0.3:1300")
 	time.Sleep(10 * time.Second)
 
-	_, ok := consumer.clientManager.ip2Client["127.0.0.3:1300"]
-	if !ok {
+	ok := consumer.clientManager.clientsManager.FindRemoteClient("127.0.0.3:1300")
+	if nil == ok {
 		t.Fail()
 		t.Logf("RegisteService|SUCC|But Client Not Get|%s", "127.0.0.3:1300")
 		return
@@ -163,8 +164,8 @@ func TestClientChange(t *testing.T) {
 		return
 	}
 	time.Sleep(10 * time.Second)
-	_, ok = consumer.clientManager.ip2Client["127.0.0.3:1300"]
-	if ok {
+	ok = consumer.clientManager.clientsManager.FindRemoteClient("127.0.0.3:1300")
+	if nil == ok {
 		t.Fail()
 		t.Logf("UnRegisteService|SUCC|But Client  Get It |%s", "127.0.0.3:1300")
 		return

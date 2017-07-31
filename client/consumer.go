@@ -8,10 +8,12 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/proto"
 	log "github.com/blackbeans/log4go"
+	"github.com/blackbeans/turbo/packet"
 )
 
 type Service struct {
@@ -205,29 +207,19 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	}
 
-	//3.发送网络请求
-	data, err := json.Marshal(cmd)
-	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|MarshalRequest|FAIL|%s|%s", err, cmd)
-		return errFunc(err)
-	}
-
 	//4.等待响应、超时、异常处理
-	result, err := c.Get(string(data)).Result()
-	//5.返回调用结果
+	req := packet.NewPacket(proto.REQ, []byte{})
+	req.PayLoad = cmd
+	response, err := c.WriteAndGet(*req,
+		time.Duration(int64(self.options.ProcessTimeout)*int64(time.Second)))
+
 	if nil != err {
 		//response error and close this connection
 		log.ErrorLog("moa_client", "MoaConsumer|InvokeFail|%s|%s", err, cmd)
 		return errFunc(err)
 	}
 
-	var resp proto.MoaRawRespPacket
-	err = json.Unmarshal([]byte(result), &resp)
-
-	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|UnmarshalResponse|%v|%s|%s|%s", err, serviceUri, method, result)
-		return errFunc(err)
-	}
+	resp := response.(proto.MoaRawRespPacket)
 
 	//获取非Error的返回类型
 	var resultType reflect.Type

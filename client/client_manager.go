@@ -3,26 +3,28 @@ package client
 import (
 	"errors"
 	"fmt"
-	"github.com/blackbeans/go-moa-client/client/hash"
-	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/go-moa/lb"
-	log "github.com/blackbeans/log4go"
-	"gopkg.in/redis.v5"
+	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/blackbeans/go-moa-client/client/hash"
+	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa/lb"
+	"github.com/blackbeans/go-moa/proto"
+	log "github.com/blackbeans/log4go"
+	"github.com/blackbeans/turbo"
+	tclient "github.com/blackbeans/turbo/client"
+	"github.com/blackbeans/turbo/codec"
+	"github.com/blackbeans/turbo/packet"
 )
 
 type MoaClientManager struct {
-	uri2Pool   map[string] /*uri*/ []*redis.Client
-	ip2Options map[string] /*ip:port*/ *redis.Options
-	ip2Client  map[string] /**ip:port*/ *redis.Client
-	// []string /*ip:port*/
-	uri2Ips map[string] /*uri*/ hash.Strategy
-
-	addrManager *AddressManager
-	op          *ClientOption
-	lock        sync.RWMutex
+	clientsManager *tclient.ClientManager
+	uri2Ips        map[string] /*uri*/ hash.Strategy
+	addrManager    *AddressManager
+	op             *ClientOption
+	lock           sync.RWMutex
 }
 
 func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
@@ -31,12 +33,16 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 		reg = lb.NewZkRegistry(strings.TrimPrefix(op.RegistryHosts, core.SCHEMA_ZK), uris, false)
 	}
 
+	reconnect := tclient.NewReconnectManager(true, 10*time.Second, 10,
+		func(ga *tclient.GroupAuth, remoteClient *tclient.RemotingClient) (bool, error) {
+			return true, nil
+		})
+
 	manager := &MoaClientManager{}
 	manager.op = op
-	manager.uri2Pool = make(map[string] /*uri*/ []*redis.Client, 10)
-	manager.ip2Options = make(map[string] /*ip:port*/ *redis.Options, 10)
-	manager.ip2Client = make(map[string] /**ip:port*/ *redis.Client, 10)
+	manager.clientsManager = tclient.NewClientManager(reconnect)
 	manager.uri2Ips = make(map[string]hash.Strategy, 2)
+
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
 
@@ -44,61 +50,45 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 }
 
 func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
-	//需要移除的连接
-	removeHostport := make([]string, 0, 2)
+
 	//新增地址
 	addHostport := make([]string, 0, 2)
 
-	self.lock.RLock()
+	self.lock.Lock()
 	//寻找新增连接
 	for _, ip := range hosts {
-
-		_, ok := self.ip2Options[ip]
-		if !ok {
+		exist := self.clientsManager.FindRemoteClient(ip)
+		if nil == exist {
 			addHostport = append(addHostport, ip)
 		}
 	}
 
-	self.lock.RUnlock()
-
-	//新增连接
-	addOp2Clients := make(map[*redis.Options]*redis.Client, 10)
 	for _, hp := range addHostport {
-		op := &redis.Options{
-			Addr:        hp,
-			Password:    "", // no password set
-			DB:          0,  // use default DB
-			PoolSize:    self.op.PoolSizePerHost,
-			PoolTimeout: 10 * time.Minute,
-			ReadTimeout: self.op.ProcessTimeout}
-		//创建redis的实例
-		c := redis.NewClient(op)
-		addOp2Clients[op] = c
-		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
-	}
-
-	//开始执行新增连接和删除操作
-	self.lock.Lock()
-	//add first
-	for op, c := range addOp2Clients {
-
-		self.ip2Client[op.Addr] = c
-
-		self.ip2Options[op.Addr] = op
-
-		log.InfoLog("config_center", "MoaClientManager|Store Client|SUCC|%s", op.Addr)
-	}
-
-	//重新构建uri对应的连接组
-	newPool := make([]*redis.Client, 0, 5)
-	for _, ip := range hosts {
-		c, ok := self.ip2Client[ip]
-		if ok {
-			newPool = append(newPool, c)
+		//		创建redis的实例
+		addr, _ := net.ResolveTCPAddr("tcp", hp)
+		conn, err := net.DialTCP("tcp", nil, addr)
+		if nil != err {
+			log.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s", hp)
+			continue
 		}
 
+		//参数
+		rcc := turbo.NewRemotingConfig(
+			fmt.Sprintf("turbo-client:%s", hp),
+			1000, 16*1024,
+			16*1024, 20000, 20000,
+			20*time.Second, 100000)
+
+		c := tclient.NewRemotingClient(conn, func() codec.ICodec {
+			return proto.BinaryCodec{
+				MaxFrameLength: packet.MAX_PACKET_BYTES}
+		}, func(c *tclient.RemotingClient, p *packet.Packet) {
+			//转发给后端处理器
+		}, rcc)
+		c.Start()
+		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
+		self.clientsManager.Auth(tclient.NewGroupAuth(hp, ""), c)
 	}
-	self.uri2Pool[uri] = newPool
 
 	if self.op.SelectorStrategy == hash.STRATEGY_KETAMA {
 		self.uri2Ips[uri] = hash.NewKetamaStrategy(hosts)
@@ -108,7 +98,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		self.uri2Ips[uri] = hash.NewRandomStrategy(hosts)
 	}
 
-	log.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v|%d", uri, hosts, len(newPool))
+	log.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)
 	//清理掉不再使用redisClient
 	usingIps := make(map[string]bool, 5)
 	for _, v := range self.uri2Ips {
@@ -117,22 +107,12 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		})
 	}
 
-	for ip := range self.ip2Options {
+	for ip := range self.clientsManager.ClientsClone() {
 		_, ok := usingIps[ip]
 		if !ok {
 			//不再使用了移除
-			removeHostport = append(removeHostport, ip)
+			self.clientsManager.DeleteClients(ip)
 		}
-	}
-
-	for _, hp := range removeHostport {
-		delete(self.ip2Options, hp)
-		c, ok := self.ip2Client[hp]
-		if ok {
-			c.Close()
-			log.WarnLog("config_center", "MoaClientManager|Remove Expired Client|%s", hp)
-		}
-		delete(self.ip2Client, hp)
 	}
 	self.lock.Unlock()
 
@@ -140,7 +120,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 }
 
 //根据Uri获取连接
-func (self MoaClientManager) SelectClient(uri string, key string) (*redis.Client, error) {
+func (self MoaClientManager) SelectClient(uri string, key string) (*tclient.RemotingClient, error) {
 
 	self.lock.RLock()
 	defer self.lock.RUnlock()
@@ -148,8 +128,8 @@ func (self MoaClientManager) SelectClient(uri string, key string) (*redis.Client
 	strategy, ok := self.uri2Ips[uri]
 	if ok {
 		ip := strategy.Select(key)
-		p, yes := self.ip2Client[ip]
-		if yes {
+		p := self.clientsManager.FindRemoteClient(ip)
+		if nil != p {
 			return p, nil
 		}
 	}
@@ -158,7 +138,5 @@ func (self MoaClientManager) SelectClient(uri string, key string) (*redis.Client
 }
 
 func (self MoaClientManager) Destroy() {
-	for _, c := range self.ip2Client {
-		c.Close()
-	}
+	self.clientsManager.Shutdown()
 }
