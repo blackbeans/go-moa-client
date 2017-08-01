@@ -1,7 +1,4 @@
 #### MOA Client使用方式
-* Usage
-     
-     [样例参考](https://github.com/blackbeans/go-moa-demo)
 
 * 安装：
      安装ZooKeeper
@@ -9,7 +6,6 @@
 
     ``` 
     go get  github.com/blackbeans/go-moa-client/client
-    go get  github.com/blackbeans/go-moa/proxy
     
     ```
 
@@ -54,18 +50,13 @@
 
     env:Macbook Pro 2.2 GHz Intel Core i7
 
+```golang
+
     go test --bench=".*" github.com/blackbeans/go-moa-client/client -run=BenchmarkMakeRpcFunc
 
-    BenchmarkMakeRpcFunc-8    20000         64517 ns/op
-* redis-benchmark
+    BenchmarkParallerMakeRpcFunc-8   	   50000	     28315 ns/op
 
-    -  env:Macbook Pro 2.2 GHz Intel Core i7
-  
-    -  go run github.com/blackbeans/go-moa-client/benchmark.go
-
-    redis-benchmark -h host -p 13000 -n 1000000 -c 100 get '{"action":"/service/bibi/go-moa","params":{"m":"setName","args":["a"]}}'
-
-    redis-cli -h 10.26.27.99 -p 9095 get '{"action":"/service/snowflake-service","params":{"m":"NextId","args":[]}}'
+```
 
 
 
