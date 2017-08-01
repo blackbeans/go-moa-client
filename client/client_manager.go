@@ -26,6 +26,7 @@ type MoaClientManager struct {
 	uri2Ips        map[string] /*uri*/ hash.Strategy
 	addrManager    *AddressManager
 	op             *ClientOption
+	snappy         bool
 	lock           sync.RWMutex
 }
 
@@ -44,10 +45,39 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 	manager.op = op
 	manager.clientsManager = tclient.NewClientManager(reconnect)
 	manager.uri2Ips = make(map[string]hash.Strategy, 2)
-
+	if strings.ToLower(op.Compress) == "snappy" {
+		manager.snappy = true
+	}
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
+	go manager.CheckAlive()
 	return manager
+}
+
+func (self *MoaClientManager) CheckAlive() {
+	t := time.Tick(5 * time.Second)
+	for {
+		<-t
+		for hp, c := range self.clientsManager.ClientsClone() {
+			ip := hp
+			server := c
+			//如果当前client是空闲的则需要发送Ping-pong
+			if c.Idle() {
+				go func() {
+					pipo := proto.PiPo{Timestamp: time.Now().Unix()}
+					p := packet.NewPacket(proto.PING, nil)
+					p.PayLoad = pipo
+					err := server.Ping(p, self.op.ProcessTimeout)
+					if nil != err {
+						log4go.WarnLog("config_center", "CheckAlive|FAIL|%s|%v", ip, err)
+					} else {
+						log4go.WarnLog("config_center", "CheckAlive|SUCC|%s...", ip)
+					}
+				}()
+			}
+		}
+
+	}
 }
 
 func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
@@ -66,7 +96,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 	for _, hp := range addHostport {
 
-		connection, err := net.DialTimeout("tcp4", hp, 10*time.Second)
+		connection, err := net.DialTimeout("tcp4", hp, self.op.ProcessTimeout*5)
 		if nil != err {
 			log.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hp, err)
 			continue
@@ -81,7 +111,8 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 		c := tclient.NewRemotingClient(conn, func() codec.ICodec {
 			return proto.BinaryCodec{
-				MaxFrameLength: packet.MAX_PACKET_BYTES}
+				MaxFrameLength: packet.MAX_PACKET_BYTES,
+				SnappyCompress: self.snappy}
 		}, self.packetDis, rcc)
 		c.Start()
 		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
@@ -142,5 +173,10 @@ func (self *MoaClientManager) Destroy() {
 
 //设置
 func (self *MoaClientManager) packetDis(c *tclient.RemotingClient, p *packet.Packet) {
-	c.Attach(p.Header.Opaque, p.PayLoad)
+	if p.Header.CmdType == proto.PONG {
+		pipo := p.PayLoad.(proto.PiPo)
+		c.Attach(p.Header.Opaque, pipo.Timestamp)
+	} else {
+		c.Attach(p.Header.Opaque, p.PayLoad)
+	}
 }

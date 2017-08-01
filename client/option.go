@@ -2,13 +2,14 @@ package client
 
 import (
 	"errors"
-	"github.com/blackbeans/go-moa-client/client/hash"
-	log "github.com/blackbeans/log4go"
-	"github.com/naoina/toml"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/blackbeans/go-moa-client/client/hash"
+	log "github.com/blackbeans/log4go"
+	"github.com/naoina/toml"
 )
 
 type HostPort struct {
@@ -37,6 +38,7 @@ type Cluster struct {
 	PoolSizePerHost  int    //5
 	LogFile          string //log4go的文件路径
 	SelectorStrategy string //客户端选择连接方式 ketama/random 默认random
+	Compress         string //compress=snappy
 }
 
 //---------最终需要的ClientCOption
@@ -47,6 +49,7 @@ type ClientOption struct {
 	ProcessTimeout   time.Duration
 	PoolSizePerHost  int
 	SelectorStrategy hash.StrategyType
+	Compress         string // compress=snappy
 }
 
 func LoadConfiruation(path string) (*ClientOption, error) {
@@ -87,6 +90,11 @@ func LoadConfiruation(path string) (*ClientOption, error) {
 	mop.RegistryHosts = reg.Hosts
 	mop.ProcessTimeout = time.Duration(int64(cluster.ProcessTimeout) * int64(time.Second))
 	mop.PoolSizePerHost = cluster.PoolSizePerHost
+	if len(cluster.Compress) <= 0 {
+		mop.Compress = "snappy"
+	} else {
+		mop.Compress = cluster.Compress
+	}
 
 	strategy := hash.STRATEGY_RANDOM
 	switch strings.ToUpper(cluster.SelectorStrategy) {

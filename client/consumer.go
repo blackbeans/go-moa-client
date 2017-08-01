@@ -57,7 +57,6 @@ func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 				Interface:  clone}
 			globalUnique[uri] = nil
 		}
-
 	}
 
 	//去重
@@ -193,7 +192,10 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		self.buffPool.Put(buff)
 	}()
 
-	for _, arg := range in {
+	for i, arg := range in {
+		if i <= 0 {
+			buff.WriteString(arg.String())
+		}
 		args = append(args, arg.Interface())
 	}
 	cmd.Params.Args = args
