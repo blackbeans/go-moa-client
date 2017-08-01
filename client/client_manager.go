@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blackbeans/log4go"
+
 	"github.com/blackbeans/go-moa-client/client/hash"
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
@@ -45,12 +47,11 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
-
 	return manager
 }
 
-func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
-
+func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
+	log4go.WarnLog("config_center", "OnAddressChange|%s|%s", uri, hosts)
 	//新增地址
 	addHostport := make([]string, 0, 2)
 
@@ -64,14 +65,13 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 	}
 
 	for _, hp := range addHostport {
-		//		创建redis的实例
-		addr, _ := net.ResolveTCPAddr("tcp", hp)
-		conn, err := net.DialTCP("tcp", nil, addr)
+
+		connection, err := net.DialTimeout("tcp4", hp, 10*time.Second)
 		if nil != err {
-			log.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s", hp)
+			log.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hp, err)
 			continue
 		}
-
+		conn := connection.(*net.TCPConn)
 		//参数
 		rcc := turbo.NewRemotingConfig(
 			fmt.Sprintf("turbo-client:%s", hp),
@@ -82,9 +82,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		c := tclient.NewRemotingClient(conn, func() codec.ICodec {
 			return proto.BinaryCodec{
 				MaxFrameLength: packet.MAX_PACKET_BYTES}
-		}, func(c *tclient.RemotingClient, p *packet.Packet) {
-			//转发给后端处理器
-		}, rcc)
+		}, self.packetDis, rcc)
 		c.Start()
 		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
 		self.clientsManager.Auth(tclient.NewGroupAuth(hp, ""), c)
@@ -99,7 +97,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 	}
 
 	log.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)
-	//清理掉不再使用redisClient
+	//清理掉不再使用client
 	usingIps := make(map[string]bool, 5)
 	for _, v := range self.uri2Ips {
 		v.Iterator(func(i int, ip string) {
@@ -112,6 +110,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		if !ok {
 			//不再使用了移除
 			self.clientsManager.DeleteClients(ip)
+			log.InfoLog("config_center", "MoaClientManager|RemoveUnUse Client|SUCC|%s", ip)
 		}
 	}
 	self.lock.Unlock()
@@ -120,7 +119,7 @@ func (self MoaClientManager) OnAddressChange(uri string, hosts []string) {
 }
 
 //根据Uri获取连接
-func (self MoaClientManager) SelectClient(uri string, key string) (*tclient.RemotingClient, error) {
+func (self *MoaClientManager) SelectClient(uri string, key string) (*tclient.RemotingClient, error) {
 
 	self.lock.RLock()
 	defer self.lock.RUnlock()
@@ -137,6 +136,11 @@ func (self MoaClientManager) SelectClient(uri string, key string) (*tclient.Remo
 
 }
 
-func (self MoaClientManager) Destroy() {
+func (self *MoaClientManager) Destroy() {
 	self.clientsManager.Shutdown()
+}
+
+//设置
+func (self *MoaClientManager) packetDis(c *tclient.RemotingClient, p *packet.Packet) {
+	c.Attach(p.Header.Opaque, p.PayLoad)
 }

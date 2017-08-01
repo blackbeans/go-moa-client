@@ -68,6 +68,7 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 					}
 				}()
 			} else {
+
 				if len(addrs) > 0 {
 					sort.Strings(addrs)
 					hosts[uri] = addrs

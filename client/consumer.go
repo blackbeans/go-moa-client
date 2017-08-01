@@ -12,6 +12,7 @@ import (
 
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/proto"
+
 	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo/packet"
 )
@@ -66,17 +67,17 @@ func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 	}
 	consumer.services = services
 	consumer.options = options
-	consumer.clientManager = NewMoaClientManager(options, uris)
+
 	pool := &sync.Pool{}
 	pool.New = func() interface{} {
 		return bytes.NewBuffer(make([]byte, 0, 1024))
 	}
 	consumer.buffPool = pool
-
 	//添加代理
 	for _, s := range services {
 		consumer.makeRpcFunc(s)
 	}
+	consumer.clientManager = NewMoaClientManager(options, uris)
 	return consumer
 }
 
@@ -208,7 +209,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 
 	//4.等待响应、超时、异常处理
-	req := packet.NewPacket(proto.REQ, []byte{})
+	req := packet.NewPacket(proto.REQ, nil)
 	req.PayLoad = cmd
 	response, err := c.WriteAndGet(*req,
 		time.Duration(int64(self.options.ProcessTimeout)*int64(time.Second)))
@@ -220,7 +221,6 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 
 	resp := response.(proto.MoaRawRespPacket)
-
 	//获取非Error的返回类型
 	var resultType reflect.Type
 	for _, t := range outType {
@@ -256,7 +256,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	} else {
 		//invoke Fail
 		log.ErrorLog("moa_client",
-			"MoaConsumer|RPC FAIL|%s|%s|%s",
+			"MoaConsumer|RPC FAIL|%s|%s|%v",
 			s.ServiceUri, method, resp)
 		err = errors.New(resp.Message)
 		return errFunc(err)

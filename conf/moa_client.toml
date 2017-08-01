@@ -1,6 +1,3 @@
-# This is a TOML document.
-
-
 #当前使用的环境
 [env]
 name="moa-demo"
@@ -11,8 +8,6 @@ runMode="dev"
 [registry]
 	[registry.dev]
 		hosts="zk://localhost:2181"
-	[registry.online]
-		hosts="zk://vm-bibi-zk-mq001.vm:2181,vm-bibi-zk-mq002.vm:2181,vm-bibi-zk-mq003.vm:2181" 
 
 #cluster的服务器
 [clusters]
@@ -25,13 +20,3 @@ runMode="dev"
 		logFile="../conf/log_test.xml"
 		#连接选择方式random或ketama
 		selectorStrategy="ketama"
-	[clusters.online]
-		#env=dev/online
-		env="online" 
-		processTimeout=5
-		#每个机器的连接数量
-		poolSizePerHost = 5
-		logFile="../conf/log_test.xml"
-		#连接选择方式random或ketama
-		selectorStrategy="ketama"
-
