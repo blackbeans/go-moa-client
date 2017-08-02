@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/blackbeans/log4go"
+	"github.com/blackbeans/turbo"
 
 	"github.com/blackbeans/go-moa-client/client/hash"
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
 	"github.com/blackbeans/go-moa/proto"
 	log "github.com/blackbeans/log4go"
-	"github.com/blackbeans/turbo"
 	tclient "github.com/blackbeans/turbo/client"
 	"github.com/blackbeans/turbo/codec"
 	"github.com/blackbeans/turbo/packet"
@@ -28,6 +28,7 @@ type MoaClientManager struct {
 	op             *ClientOption
 	snappy         bool
 	lock           sync.RWMutex
+	remoteConfig   *turbo.RemotingConfig
 }
 
 func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
@@ -42,6 +43,12 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 		})
 
 	manager := &MoaClientManager{}
+	//参数
+	manager.remoteConfig = turbo.NewRemotingConfig(
+		fmt.Sprintf("moa-client:%s", op.AppName),
+		1000, 16*1024,
+		16*1024, 20000, 20000,
+		20*time.Second, 100000)
 	manager.op = op
 	manager.clientsManager = tclient.NewClientManager(reconnect)
 	manager.uri2Ips = make(map[string]hash.Strategy, 2)
@@ -50,6 +57,7 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 	}
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
 	manager.addrManager = addrManager
+
 	go manager.CheckAlive()
 	return manager
 }
@@ -102,18 +110,12 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 			continue
 		}
 		conn := connection.(*net.TCPConn)
-		//参数
-		rcc := turbo.NewRemotingConfig(
-			fmt.Sprintf("turbo-client:%s", hp),
-			1000, 16*1024,
-			16*1024, 20000, 20000,
-			20*time.Second, 100000)
 
 		c := tclient.NewRemotingClient(conn, func() codec.ICodec {
 			return proto.BinaryCodec{
 				MaxFrameLength: packet.MAX_PACKET_BYTES,
 				SnappyCompress: self.snappy}
-		}, self.packetDis, rcc)
+		}, self.packetDis, self.remoteConfig)
 		c.Start()
 		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
 		self.clientsManager.Auth(tclient.NewGroupAuth(hp, ""), c)
