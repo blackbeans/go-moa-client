@@ -157,7 +157,7 @@ func (self *MoaConsumer) makeRpcFunc(s core.Service) {
 		}(s, name, outType)
 		v := reflect.MakeFunc(t, f)
 		method.Set(v)
-		log.InfoLog("moa_client", "MoaConsumer|makeRpcFunc|SUCC|%s->%s", s)
+		log.InfoLog("moa_client", "MoaConsumer|makeRpcFunc|SUCC|%s->%s", s.ServiceUri, s.GroupId)
 	}
 }
 
