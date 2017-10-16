@@ -167,9 +167,11 @@ func (self *MoaClientManager) SelectClient(uri string, key string) (*tclient.Rem
 	strategy, ok := self.uri2Ips[uri]
 	if ok {
 		ip := strategy.Select(key)
-		p := self.clientsManager.FindRemoteClient(ip)
-		if nil != p {
-			return p, nil
+		if len(ip) > 0 {
+			p := self.clientsManager.FindRemoteClient(ip)
+			if nil != p {
+				return p, nil
+			}
 		}
 	}
 	return nil, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))

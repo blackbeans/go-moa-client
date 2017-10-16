@@ -66,7 +66,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	consumer.Destroy()
 }
 
-func BenchmarkParallerMakeRpcFunc(b *testing.B) {
+func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	b.StopTimer()
 	consumer := NewMoaConsumer("../conf/moa.toml",
 		[]Service{Service{
