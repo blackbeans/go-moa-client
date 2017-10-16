@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa/lb"
 )
 
 var consumer *MoaConsumer
@@ -12,7 +13,7 @@ var consumer *MoaConsumer
 func init() {
 
 	uinter := (*IUserService)(nil)
-	core.NewApplcation("../conf/moa_server.toml", func() []core.Service {
+	core.NewApplcation("../conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/user-service",
@@ -32,10 +33,11 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	//等待5s注册地址
 	time.Sleep(5 * time.Second)
 
-	consumer := NewMoaConsumer("../conf/moa_client.toml",
-		[]Service{Service{
-			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}},
+	consumer := NewMoaConsumer("../conf/moa.toml",
+		[]Service{
+			Service{
+				ServiceUri: "/service/user-service",
+				Interface:  &UserService{}},
 			Service{
 				ServiceUri: "/service/user-service-panic",
 				Interface:  &UserServicePanic{},
@@ -66,7 +68,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 
 func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 	b.StopTimer()
-	consumer := NewMoaConsumer("../conf/moa_client.toml",
+	consumer := NewMoaConsumer("../conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -93,7 +95,7 @@ func BenchmarkParallerMakeRpcFunc(b *testing.B) {
 func TestClientChange(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
-	consumer := NewMoaConsumer("../conf/moa_client.toml",
+	consumer := NewMoaConsumer("../conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -117,7 +119,7 @@ func TestClientChange(t *testing.T) {
 
 	t.Log("-----------Remove Node 10.0.1.181:13000")
 
-	succ := consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service", "10.0.1.181:13000", "redis", "")
+	succ := consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service", "10.0.1.181:13000", lb.PROTOCOL, "")
 	if !succ {
 		t.Fail()
 		return

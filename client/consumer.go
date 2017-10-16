@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/proto"
@@ -26,17 +25,18 @@ type Service struct {
 
 type MoaConsumer struct {
 	services      map[string]core.Service
-	options       *ClientOption
+	options       core.Option
 	clientManager *MoaClientManager
 	buffPool      *sync.Pool
 }
 
 func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 
-	options, err := LoadConfiruation(confPath)
+	options, err := core.LoadConfiruation(confPath)
 	if nil != err {
 		panic(err)
 	}
+	options = core.InitClientOption(options)
 
 	services := make(map[string]core.Service, 2)
 	consumer := &MoaConsumer{}
@@ -214,7 +214,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	req := packet.NewPacket(proto.REQ, nil)
 	req.PayLoad = cmd
 	response, err := c.WriteAndGet(*req,
-		time.Duration(int64(self.options.ProcessTimeout)*int64(time.Second)))
+		self.options.Clusters[self.options.Client.RunMode].ProcessTimeout)
 
 	if nil != err {
 		//response error and close this connection

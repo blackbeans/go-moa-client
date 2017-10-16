@@ -9,10 +9,6 @@ import (
 	log "github.com/blackbeans/log4go"
 )
 
-const (
-	PROTOCOL_TYPE = "redis"
-)
-
 type IAddressListener func(uri string, hosts []string)
 
 type AddressManager struct {
@@ -56,7 +52,7 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 	for _, uri := range self.serviceUris {
 		for i := 0; i < 3; i++ {
 			serviceUri, groupId := splitServiceUri(uri)
-			addrs, err := self.registry.GetService(serviceUri, PROTOCOL_TYPE, groupId)
+			addrs, err := self.registry.GetService(serviceUri, lb.PROTOCOL, groupId)
 			if nil != err {
 				log.WarnLog("config_center", "AddressManager|loadAvaiableAddress|FAIL|%s|%s", err, uri)
 				func() {

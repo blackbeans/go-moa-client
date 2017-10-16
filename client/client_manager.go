@@ -11,7 +11,6 @@ import (
 	"github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo"
 
-	"github.com/blackbeans/go-moa-client/client/hash"
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
 	"github.com/blackbeans/go-moa/proto"
@@ -23,21 +22,24 @@ import (
 
 type MoaClientManager struct {
 	clientsManager *tclient.ClientManager
-	uri2Ips        map[string] /*uri*/ hash.Strategy
+	uri2Ips        map[string] /*uri*/ core.Strategy
 	addrManager    *AddressManager
-	op             *ClientOption
+	op             core.Option
 	snappy         bool
 	lock           sync.RWMutex
 	remoteConfig   *turbo.RemotingConfig
 }
 
-func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
+func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
+
+	cluster := option.Clusters[option.Client.RunMode]
 	var reg lb.IRegistry
-	if strings.HasPrefix(op.RegistryHosts, core.SCHEMA_ZK) {
-		reg = lb.NewZkRegistry(strings.TrimPrefix(op.RegistryHosts, core.SCHEMA_ZK), uris, false)
+	if strings.HasPrefix(cluster.Registry, core.SCHEMA_ZK) {
+		reg = lb.NewZkRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEMA_ZK), uris, false)
 	}
 
-	reconnect := tclient.NewReconnectManager(true, 10*time.Second, 10,
+	reconnect := tclient.NewReconnectManager(true,
+		10*time.Second, 10,
 		func(ga *tclient.GroupAuth, remoteClient *tclient.RemotingClient) (bool, error) {
 			return true, nil
 		})
@@ -45,14 +47,19 @@ func NewMoaClientManager(op *ClientOption, uris []string) *MoaClientManager {
 	manager := &MoaClientManager{}
 	//参数
 	manager.remoteConfig = turbo.NewRemotingConfig(
-		fmt.Sprintf("moa-client:%s", op.AppName),
-		1000, 16*1024,
-		16*1024, 20000, 20000,
-		20*time.Second, 100000)
-	manager.op = op
+		"moa-client",
+		cluster.MaxDispatcherSize,
+		cluster.ReadBufferSize,
+		cluster.ReadBufferSize,
+		cluster.WriteChannelSize,
+		cluster.ReadChannelSize,
+		cluster.IdleTimeout,
+		50*10000)
+
+	manager.op = option
 	manager.clientsManager = tclient.NewClientManager(reconnect)
-	manager.uri2Ips = make(map[string]hash.Strategy, 2)
-	if strings.ToLower(op.Compress) == "snappy" {
+	manager.uri2Ips = make(map[string]core.Strategy, 2)
+	if strings.ToLower(option.Client.Compress) == "snappy" {
 		manager.snappy = true
 	}
 	addrManager := NewAddressManager(reg, uris, manager.OnAddressChange)
@@ -75,7 +82,7 @@ func (self *MoaClientManager) CheckAlive() {
 					pipo := proto.PiPo{Timestamp: time.Now().Unix()}
 					p := packet.NewPacket(proto.PING, nil)
 					p.PayLoad = pipo
-					err := server.Ping(p, self.op.ProcessTimeout)
+					err := server.Ping(p, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout)
 					if nil != err {
 						log4go.WarnLog("config_center", "CheckAlive|FAIL|%s|%v", ip, err)
 					} else {
@@ -104,7 +111,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 	for _, hp := range addHostport {
 
-		connection, err := net.DialTimeout("tcp4", hp, self.op.ProcessTimeout*5)
+		connection, err := net.DialTimeout("tcp", hp, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout*5)
 		if nil != err {
 			log.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hp, err)
 			continue
@@ -121,12 +128,12 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		self.clientsManager.Auth(tclient.NewGroupAuth(hp, ""), c)
 	}
 
-	if self.op.SelectorStrategy == hash.STRATEGY_KETAMA {
-		self.uri2Ips[uri] = hash.NewKetamaStrategy(hosts)
-	} else if self.op.SelectorStrategy == hash.STRATEGY_RANDOM {
-		self.uri2Ips[uri] = hash.NewRandomStrategy(hosts)
+	if self.op.Client.SelectorStrategy == core.STRATEGY_KETAMA {
+		self.uri2Ips[uri] = core.NewKetamaStrategy(hosts)
+	} else if self.op.Client.SelectorStrategy == core.STRATEGY_RANDOM {
+		self.uri2Ips[uri] = core.NewRandomStrategy(hosts)
 	} else {
-		self.uri2Ips[uri] = hash.NewRandomStrategy(hosts)
+		self.uri2Ips[uri] = core.NewRandomStrategy(hosts)
 	}
 
 	log.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)

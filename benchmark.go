@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/blackbeans/go-moa/core"
 	"os"
 	"os/signal"
+
+	"github.com/blackbeans/go-moa/core"
 )
 
 type IGoMoaDemo interface {
@@ -23,7 +24,7 @@ func (self GoMoaDemo) Ping() error {
 }
 
 func main() {
-	app := core.NewApplcation("conf/moa_server.toml", func() []core.Service {
+	app := core.NewApplcation("conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/bibi/go-moa",
