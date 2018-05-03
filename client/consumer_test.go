@@ -54,6 +54,14 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 		t.Logf("Oops--------Hello,Buddy|Has Clients|%s|%v\n", a, err)
 	}
 
+
+	time := time.Unix(time.Now().UnixNano()/1000,0)
+	err = h.GetTime(time)
+	if nil ==err {
+		t.Logf("--------Should Error But not|%s\n", time)
+		t.FailNow()
+	}
+
 	sp, _ := consumer.GetServiceWithGroupid("/service/user-service-panic", "s-mts-group")
 	panicService := sp.(*UserServicePanic)
 	a, err = panicService.GetName("a")
