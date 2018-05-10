@@ -6,6 +6,7 @@ import (
 
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
+	gpsapi "git.uneed.com/server/group-service/api"
 )
 
 var consumer *MoaConsumer
@@ -146,3 +147,20 @@ func TestClientChange(t *testing.T) {
 	}
 	consumer.Destroy()
 }
+
+
+func TestMakeRPC(t *testing.T){
+	 NewMoaConsumer("../conf/moa.toml",
+		[]Service{
+			Service{
+				ServiceUri: "/service/group-service",
+				Interface:  &gpsapi.GroupServiceProxy{}}})
+	time.Sleep(10 *time.Minute)
+
+
+
+
+
+}
+
+

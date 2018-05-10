@@ -130,35 +130,57 @@ func (self *MoaConsumer) makeRpcFunc(s core.Service) {
 	htype := reflect.TypeOf(obj.Interface())
 	for i := 0; i < numf; i++ {
 		method := obj.Field(i)
-		//fuck 统一约定方法首字母小写
-		name := strings.ToLower(string(htype.Field(i).Name[0])) +
-			htype.Field(i).Name[1:]
-		t := method.Type()
-		outType := make([]reflect.Type, 0, 2)
-		//返回值必须大于等于1个并且小于2，并且其中一个必须为error类型
-		if t.NumOut() >= 1 && t.NumOut() <= 2 {
-			for idx := 0; idx < t.NumOut(); idx++ {
-				outType = append(outType, t.Out(idx))
-			}
-			if !outType[len(outType)-1].Implements(errorType) {
-				panic(fmt.Errorf("%s Method  %s Last Return Type Must Be An Error! [%s]",
-					s.ServiceUri, name, outType[len(outType)-1].String()))
-			}
-		} else {
-			panic(fmt.Errorf("%s Method  %s Last Return Type Must Be More Than An Error!", s.ServiceUri, name))
-		}
 
-		f := func(s core.Service, methodName string,
-			outType []reflect.Type) func(in []reflect.Value) []reflect.Value {
-			return func(in []reflect.Value) []reflect.Value {
-				vals := self.rpcInvoke(s, methodName, in, outType)
-				return vals
+		//处理嵌套继承
+		if method.Kind() == reflect.Struct{
+			structType := method.Type()
+			for j:=0  ;j< method.NumField();j++{
+				function  := method.Field(j)
+				//如果是func类型那么就反射
+				if function.Kind() == reflect.Func{
+					self.proxyMethod(s,structType,j,function)
+
+				}else{
+					//如果是别的类型，这里就说不过去了。潜逃了好几层
+					panic(fmt.Errorf("ServiceProxy :[%s->%s]Too Deep  Nesting !",s.ServiceUri,obj.String()))
+				}
 			}
-		}(s, name, outType)
-		v := reflect.MakeFunc(t, f)
-		method.Set(v)
-		log.InfoLog("moa_client", "MoaConsumer|makeRpcFunc|SUCC|%s->%s", s.ServiceUri, s.GroupId)
+		}else {
+			self.proxyMethod(s,htype,i,method)
+		}
 	}
+	log.InfoLog("moa_client", "MoaConsumer|Proxy|SUCC|%s->%s", s.ServiceUri, s.GroupId)
+}
+
+//动态代理调用方法
+func (self *MoaConsumer)proxyMethod(s core.Service,htype reflect.Type,i int,method reflect.Value){
+	//fuck 统一约定方法首字母小写
+	name := strings.ToLower(string(htype.Field(i).Name[0])) +
+		htype.Field(i).Name[1:]
+	t := method.Type()
+	outType := make([]reflect.Type, 0, 2)
+	//返回值必须大于等于1个并且小于2，并且其中一个必须为error类型
+	if t.NumOut() >= 1 && t.NumOut() <= 2 {
+		for idx := 0; idx < t.NumOut(); idx++ {
+			outType = append(outType, t.Out(idx))
+		}
+		if !outType[len(outType)-1].Implements(errorType) {
+			panic(fmt.Errorf("%s Method  %s Last Return Type Must Be An Error! [%s]",
+				s.ServiceUri, name, outType[len(outType)-1].String()))
+		}
+	} else {
+		panic(fmt.Errorf("%s Method  %s Last Return Type Must Be More Than An Error!", s.ServiceUri, name))
+	}
+
+	f := func(s core.Service, methodName string,
+		outType []reflect.Type) func(in []reflect.Value) []reflect.Value {
+		return func(in []reflect.Value) []reflect.Value {
+			vals := self.rpcInvoke(s, methodName, in, outType)
+			return vals
+		}
+	}(s, name, outType)
+	v := reflect.MakeFunc(t, f)
+	method.Set(v)
 }
 
 var errorType = reflect.TypeOf(make([]error, 1)).Elem()
