@@ -1,20 +1,86 @@
-package client
+package main
 
 import (
 	"testing"
 	"time"
-
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
-	gpsapi "git.uneed.com/server/group-service/api"
+	"errors"
 )
+
+type DemoResult struct {
+	Hosts []string `json:"hosts"`
+	Uri   string   `json:"uri"`
+}
+
+type UserService struct {
+	GetName func(serviceUri string) (*DemoResult, error)
+	SetName func(name string) error
+	Ping    func() error
+	Pong    func() (string, error)
+	GetTime func(t time.Time) error
+}
+
+type IUserService interface {
+	GetName(name string) (*DemoResult, error)
+	SetName(name string) error
+	Ping() error
+	Pong() (string, error)
+	GetTime(t time.Time) error
+}
+
+
+type UserServiceDemo struct{}
+
+func (self UserServiceDemo) GetName(name string) (*DemoResult, error) {
+	return &DemoResult{[]string{"a", "b"}, "/service/user-service"}, nil
+}
+
+func (self UserServiceDemo) SetName(name string) error {
+	return nil
+}
+
+func (self UserServiceDemo) Ping() error {
+	return nil
+
+}
+func (self UserServiceDemo) Pong() (string, error) {
+	return "pong", nil
+}
+
+func(self UserServiceDemo)GetTime(t time.Time) error{
+	return nil
+}
+
+type UserServicePanic struct{}
+
+func (self UserServicePanic) GetName(name string) (*DemoResult, error) {
+	return nil, errors.New("真的抛错了")
+}
+
+func (self UserServicePanic) SetName(name string) error {
+	return errors.New("fuck SetName Err")
+}
+
+func (self UserServicePanic) Ping() error {
+	return nil
+
+}
+func (self UserServicePanic) Pong() (string, error) {
+	return "", nil
+}
+
+func(self UserServicePanic)GetTime(t time.Time) error{
+	return nil
+}
+
 
 var consumer *MoaConsumer
 
 func init() {
 
 	uinter := (*IUserService)(nil)
-	core.NewApplcation("../conf/moa.toml", func() []core.Service {
+	core.NewApplcation("./conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/user-service",
@@ -34,7 +100,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	//等待5s注册地址
 	time.Sleep(5 * time.Second)
 
-	consumer := NewMoaConsumer("../conf/moa.toml",
+	consumer := NewMoaConsumer("./conf/moa.toml",
 		[]Service{
 			Service{
 				ServiceUri: "/service/user-service",
@@ -77,7 +143,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 
 func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	b.StopTimer()
-	consumer := NewMoaConsumer("../conf/moa.toml",
+	consumer := NewMoaConsumer("./conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -104,7 +170,7 @@ func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 func TestClientChange(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
-	consumer := NewMoaConsumer("../conf/moa.toml",
+	consumer := NewMoaConsumer("./conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -147,20 +213,4 @@ func TestClientChange(t *testing.T) {
 	}
 	consumer.Destroy()
 }
-
-
-func TestMakeRPC(t *testing.T){
-	 NewMoaConsumer("../conf/moa.toml",
-		[]Service{
-			Service{
-				ServiceUri: "/service/group-service",
-				Interface:  &gpsapi.GroupServiceProxy{}}})
-	time.Sleep(10 *time.Minute)
-
-
-
-
-
-}
-
 

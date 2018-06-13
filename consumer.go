@@ -1,4 +1,4 @@
-package client
+package main
 
 import (
 	"bytes"
@@ -10,10 +10,8 @@ import (
 	"sync"
 
 	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/go-moa/proto"
-
+	"github.com/blackbeans/turbo"
 	log "github.com/blackbeans/log4go"
-	"github.com/blackbeans/turbo/packet"
 )
 
 type Service struct {
@@ -203,7 +201,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 
 	//1.组装请求协议
-	cmd := proto.MoaReqPacket{}
+	cmd := core.MoaReqPacket{}
 	cmd.ServiceUri = s.ServiceUri
 	cmd.Params.Method = method
 	args := make([]interface{}, 0, 3)
@@ -233,7 +231,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 
 	//4.等待响应、超时、异常处理
-	req := packet.NewPacket(proto.REQ, nil)
+	req := turbo.NewPacket(core.REQ, nil)
 	req.PayLoad = cmd
 	response, err := c.WriteAndGet(*req,
 		self.options.Clusters[self.options.Client.RunMode].ProcessTimeout)
@@ -244,7 +242,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		return errFunc(err)
 	}
 
-	resp := response.(proto.MoaRawRespPacket)
+	resp := response.(core.MoaRawRespPacket)
 	//获取非Error的返回类型
 	var resultType reflect.Type
 	for _, t := range outType {
@@ -254,7 +252,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 
 	//执行成功
-	if resp.ErrCode == proto.CODE_SERVER_SUCC {
+	if resp.ErrCode == core.CODE_SERVER_SUCC {
 		var respErr reflect.Value
 		if len(resp.Message) > 0 {
 			//好恶心的写法

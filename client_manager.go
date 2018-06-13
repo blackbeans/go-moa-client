@@ -1,4 +1,4 @@
-package client
+package main
 
 import (
 	"errors"
@@ -9,25 +9,21 @@ import (
 	"time"
 
 	"github.com/blackbeans/log4go"
-	"github.com/blackbeans/turbo"
 
 	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/go-moa/lb"
-	"github.com/blackbeans/go-moa/proto"
 	log "github.com/blackbeans/log4go"
-	tclient "github.com/blackbeans/turbo/client"
-	"github.com/blackbeans/turbo/codec"
-	"github.com/blackbeans/turbo/packet"
+	"github.com/blackbeans/turbo"
+	"github.com/blackbeans/go-moa/lb"
 )
 
 type MoaClientManager struct {
-	clientsManager *tclient.ClientManager
+	clientsManager *turbo.ClientManager
 	uri2Ips        map[string] /*uri*/ core.Strategy
 	addrManager    *AddressManager
 	op             core.Option
 	snappy         bool
 	lock           sync.RWMutex
-	remoteConfig   *turbo.RemotingConfig
+	config         *turbo.TConfig
 }
 
 func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
@@ -38,15 +34,16 @@ func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
 		reg = lb.NewZkRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEMA_ZK), uris, false)
 	}
 
-	reconnect := tclient.NewReconnectManager(true,
+	reconnect := turbo.NewReconnectManager(true,
 		10*time.Second, 10,
-		func(ga *tclient.GroupAuth, remoteClient *tclient.RemotingClient) (bool, error) {
+		func(ga *turbo.GroupAuth, remoteClient *turbo.TClient) (bool, error) {
 			return true, nil
 		})
 
 	manager := &MoaClientManager{}
 	//参数
-	manager.remoteConfig = turbo.NewRemotingConfig(
+	manager.config =
+		turbo.NewTConfig(
 		"moa-client",
 		cluster.MaxDispatcherSize,
 		cluster.ReadBufferSize,
@@ -57,7 +54,7 @@ func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
 		50*10000)
 
 	manager.op = option
-	manager.clientsManager = tclient.NewClientManager(reconnect)
+	manager.clientsManager = turbo.NewClientManager(reconnect)
 	manager.uri2Ips = make(map[string]core.Strategy, 2)
 	if strings.ToLower(option.Client.Compress) == "snappy" {
 		manager.snappy = true
@@ -79,8 +76,8 @@ func (self *MoaClientManager) CheckAlive() {
 			//如果当前client是空闲的则需要发送Ping-pong
 			if c.Idle() {
 				go func() {
-					pipo := proto.PiPo{Timestamp: time.Now().Unix()}
-					p := packet.NewPacket(proto.PING, nil)
+					pipo := core.PiPo{Timestamp: time.Now().Unix()}
+					p := turbo.NewPacket(core.PING, nil)
 					p.PayLoad = pipo
 					err := server.Ping(p, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout)
 					if nil != err {
@@ -103,7 +100,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 	self.lock.Lock()
 	//寻找新增连接
 	for _, ip := range hosts {
-		exist := self.clientsManager.FindRemoteClient(ip)
+		exist := self.clientsManager.FindTClient(ip)
 		if nil == exist {
 			addHostport = append(addHostport, ip)
 		}
@@ -118,14 +115,14 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		}
 		conn := connection.(*net.TCPConn)
 
-		c := tclient.NewRemotingClient(conn, func() codec.ICodec {
-			return proto.BinaryCodec{
-				MaxFrameLength: packet.MAX_PACKET_BYTES,
+		c := turbo.NewTClient(conn, func() turbo.ICodec {
+			return core.BinaryCodec{
+				MaxFrameLength: turbo.MAX_PACKET_BYTES,
 				SnappyCompress: self.snappy}
-		}, self.packetDis, self.remoteConfig)
+		}, self.dis, self.config)
 		c.Start()
 		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
-		self.clientsManager.Auth(tclient.NewGroupAuth(hp, ""), c)
+		self.clientsManager.Auth(turbo.NewGroupAuth(hp, ""), c)
 	}
 
 	if self.op.Client.SelectorStrategy == core.STRATEGY_KETAMA {
@@ -159,7 +156,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 }
 
 //根据Uri获取连接
-func (self *MoaClientManager) SelectClient(uri string, key string) (*tclient.RemotingClient, error) {
+func (self *MoaClientManager) SelectClient(uri string, key string) (*turbo.TClient, error) {
 
 	self.lock.RLock()
 	defer self.lock.RUnlock()
@@ -168,7 +165,7 @@ func (self *MoaClientManager) SelectClient(uri string, key string) (*tclient.Rem
 	if ok {
 		ip := strategy.Select(key)
 		if len(ip) > 0 {
-			p := self.clientsManager.FindRemoteClient(ip)
+			p := self.clientsManager.FindTClient(ip)
 			if nil != p {
 				return p, nil
 			}
@@ -183,11 +180,13 @@ func (self *MoaClientManager) Destroy() {
 }
 
 //设置
-func (self *MoaClientManager) packetDis(c *tclient.RemotingClient, p *packet.Packet) {
-	if p.Header.CmdType == proto.PONG {
-		pipo := p.PayLoad.(proto.PiPo)
-		c.Attach(p.Header.Opaque, pipo.Timestamp)
+func (self *MoaClientManager) dis(ctx *turbo.TContext)error {
+	p := ctx.Message
+	if p.Header.CmdType == core.PONG {
+		pipo := p.PayLoad.(core.PiPo)
+		ctx.Client.Attach(p.Header.Opaque, pipo.Timestamp)
 	} else {
-		c.Attach(p.Header.Opaque, p.PayLoad)
+		ctx.Client.Attach(p.Header.Opaque, p.PayLoad)
 	}
+	return nil
 }
