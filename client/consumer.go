@@ -130,28 +130,28 @@ func (self *MoaConsumer) makeRpcFunc(s core.Service) {
 		method := obj.Field(i)
 
 		//处理嵌套继承
-		if method.Kind() == reflect.Struct{
+		if method.Kind() == reflect.Struct {
 			structType := method.Type()
-			for j:=0  ;j< method.NumField();j++{
-				function  := method.Field(j)
+			for j := 0; j < method.NumField(); j++ {
+				function := method.Field(j)
 				//如果是func类型那么就反射
-				if function.Kind() == reflect.Func{
-					self.proxyMethod(s,structType,j,function)
+				if function.Kind() == reflect.Func {
+					self.proxyMethod(s, structType, j, function)
 
-				}else{
+				} else {
 					//如果是别的类型，这里就说不过去了。潜逃了好几层
-					panic(fmt.Errorf("ServiceProxy :[%s->%s]Too Deep  Nesting !",s.ServiceUri,obj.String()))
+					panic(fmt.Errorf("ServiceProxy :[%s->%s]Too Deep  Nesting !", s.ServiceUri, obj.String()))
 				}
 			}
-		}else {
-			self.proxyMethod(s,htype,i,method)
+		} else {
+			self.proxyMethod(s, htype, i, method)
 		}
 	}
 	log.InfoLog("moa_client", "MoaConsumer|Proxy|SUCC|%s->%s", s.ServiceUri, s.GroupId)
 }
 
 //动态代理调用方法
-func (self *MoaConsumer)proxyMethod(s core.Service,htype reflect.Type,i int,method reflect.Value){
+func (self *MoaConsumer) proxyMethod(s core.Service, htype reflect.Type, i int, method reflect.Value) {
 	//fuck 统一约定方法首字母小写
 	name := strings.ToLower(string(htype.Field(i).Name[0])) +
 		htype.Field(i).Name[1:]

@@ -6,6 +6,8 @@ import (
 	"github.com/blackbeans/go-moa/core"
 	"github.com/blackbeans/go-moa/lb"
 	"errors"
+	"fmt"
+	"net"
 )
 
 type DemoResult struct {
@@ -80,7 +82,7 @@ var consumer *MoaConsumer
 func init() {
 
 	uinter := (*IUserService)(nil)
-	core.NewApplcation("./conf/moa.toml", func() []core.Service {
+	core.NewApplcation("../conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/user-service",
@@ -100,7 +102,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	//等待5s注册地址
 	time.Sleep(5 * time.Second)
 
-	consumer := NewMoaConsumer("./conf/moa.toml",
+	consumer := NewMoaConsumer("../conf/moa.toml",
 		[]Service{
 			Service{
 				ServiceUri: "/service/user-service",
@@ -143,7 +145,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 
 func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	b.StopTimer()
-	consumer := NewMoaConsumer("./conf/moa.toml",
+	consumer := NewMoaConsumer("../conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -167,10 +169,37 @@ func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	consumer.Destroy()
 }
 
+
+
 func TestClientChange(t *testing.T) {
 
+	ipaddress := ""
+	inters, err := net.Interfaces()
+	if nil != err {
+		panic(err)
+	} else {
+		outter:
+			for _, inter := range inters {
+			addrs, _ := inter.Addrs()
+			for _, addr := range addrs {
+				if ip, ok := addr.(*net.IPNet); ok && !ip.IP.IsLoopback() {
+					if nil != ip.IP.To4() {
+						ipaddress = ip.IP.To4().String()
+						break outter
+					}
+				}
+			}
+		}
+
+	}
+
+	if len(ipaddress)<=0{
+		panic("ip not found")
+	}
+
+
 	time.Sleep(5 * time.Second)
-	consumer := NewMoaConsumer("./conf/moa.toml",
+	consumer := NewMoaConsumer("../conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -180,21 +209,23 @@ func TestClientChange(t *testing.T) {
 	if !ok {
 		t.FailNow()
 	}
+	fmt.Printf("/service/user-service----------%v\n",ips)
 	exist := false
 	ips.Iterator(func(idx int, hp string) {
-		if hp == "10.0.1.181:13000" {
+		if hp == ipaddress+":13000" {
 			exist = true
 		}
 	})
 	if !exist {
 		t.Fail()
-		t.Logf("RegisteService|SUCC|But Client Not Get|%s", "10.0.1.181:13000")
+		t.Logf("RegisteService|SUCC|But Client Not Get|%s", ipaddress+":13000")
 		return
 	}
 
-	t.Log("-----------Remove Node 10.0.1.181:13000")
+	t.Log("-----------Remove Node "+ ipaddress+":13000")
 
-	succ := consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service", "10.0.1.181:13000", lb.PROTOCOL, "")
+	succ := consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service",
+			ipaddress+":13000", lb.PROTOCOL, "")
 	if !succ {
 		t.Fail()
 		return
@@ -203,7 +234,7 @@ func TestClientChange(t *testing.T) {
 	ips, ok = consumer.clientManager.uri2Ips["/service/user-service"]
 	exist = false
 	ips.Iterator(func(idx int, hp string) {
-		if hp == "10.0.1.181:13000" {
+		if hp == ipaddress+":13000" {
 			exist = true
 		}
 	})
@@ -212,5 +243,6 @@ func TestClientChange(t *testing.T) {
 		t.FailNow()
 	}
 	consumer.Destroy()
+	t.Log("TestClientChange FINISH ")
 }
 
