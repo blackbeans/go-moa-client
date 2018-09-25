@@ -24,7 +24,7 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 	uri2Hosts := make(map[string][]string, 2)
 	center := &AddressManager{serviceUris: uris,
 		registry: registry, uri2Hosts: uri2Hosts, listener: listener}
-	hosts := center.loadAvaiableAddress()
+	hosts := center.loadAvailableAddress()
 	center.uri2Hosts = hosts
 	go func() {
 		for {
@@ -36,7 +36,7 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 					}
 				}()
 				//需要定时拉取服务地址
-				hosts := center.loadAvaiableAddress()
+				hosts := center.loadAvailableAddress()
 				center.lock.Lock()
 				center.uri2Hosts = hosts
 				center.lock.Unlock()
@@ -47,14 +47,14 @@ func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressLi
 	return center
 }
 
-func (self AddressManager) loadAvaiableAddress() map[string][]string {
+func (self AddressManager) loadAvailableAddress() map[string][]string {
 	hosts := make(map[string][]string, 2)
 	for _, uri := range self.serviceUris {
 		for i := 0; i < 3; i++ {
 			serviceUri, groupId := splitServiceUri(uri)
 			addrs, err := self.registry.GetService(serviceUri, lb.PROTOCOL, groupId)
 			if nil != err {
-				log.WarnLog("config_center", "AddressManager|loadAvaiableAddress|FAIL|%s|%s", err, uri)
+				log.WarnLog("config_center", "AddressManager|loadAvailableAddress|FAIL|%s|%s", err, uri)
 				func() {
 					self.lock.RLock()
 					defer self.lock.RUnlock()
@@ -100,7 +100,7 @@ func (self AddressManager) loadAvaiableAddress() map[string][]string {
 					//变化通知
 					if needChange {
 						log.InfoLog("config_center",
-							"AddressManager|loadAvaiableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
+							"AddressManager|loadAvailableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
 						self.listener(uri, addrs)
 
 					}
