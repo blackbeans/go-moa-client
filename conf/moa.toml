@@ -25,17 +25,3 @@
 		writeChannelSize=1000 
 		#读异步channel长度
 		readChannelSize=1000 
-		
-	[clusters.online]
-		registry="zk://vm-bibi-zk-mq001.vm:2181,vm-bibi-zk-mq002.vm:2181,vm-bibi-zk-mq003.vm:2181" 
-		processTimeout=5
-		#最大分发处理协程数
-		maxDispatcherSize=10
-		#读取缓冲大小 
-		readBufferSize=16384
-		#写入缓冲大小
-		writeBufferSize=16384
-		#写异步channel长度
-		writeChannelSize=1000 
-		#读异步channel长度
-		readChannelSize=1000 

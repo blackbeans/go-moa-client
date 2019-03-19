@@ -11,9 +11,7 @@ import (
 	"github.com/blackbeans/log4go"
 
 	"github.com/blackbeans/go-moa/core"
-	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo"
-	"github.com/blackbeans/go-moa/lb"
 )
 
 type MoaClientManager struct {
@@ -29,9 +27,9 @@ type MoaClientManager struct {
 func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
 
 	cluster := option.Clusters[option.Client.RunMode]
-	var reg lb.IRegistry
+	var reg core.IRegistry
 	if strings.HasPrefix(cluster.Registry, core.SCHEMA_ZK) {
-		reg = lb.NewZkRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEMA_ZK), uris, false)
+		reg = core.NewZkRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEMA_ZK), uris, false)
 	}
 
 	reconnect := turbo.NewReconnectManager(true,
@@ -44,14 +42,14 @@ func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
 	//参数
 	manager.config =
 		turbo.NewTConfig(
-		"moa-client",
-		cluster.MaxDispatcherSize,
-		cluster.ReadBufferSize,
-		cluster.ReadBufferSize,
-		cluster.WriteChannelSize,
-		cluster.ReadChannelSize,
-		cluster.IdleTimeout,
-		50*10000)
+			"moa-client",
+			cluster.MaxDispatcherSize,
+			cluster.ReadBufferSize,
+			cluster.ReadBufferSize,
+			cluster.WriteChannelSize,
+			cluster.ReadChannelSize,
+			cluster.IdleTimeout,
+			50*10000)
 
 	manager.op = option
 	manager.clientsManager = turbo.NewClientManager(reconnect)
@@ -110,7 +108,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 
 		connection, err := net.DialTimeout("tcp", hp, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout*5)
 		if nil != err {
-			log.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hp, err)
+			log4go.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hp, err)
 			continue
 		}
 		conn := connection.(*net.TCPConn)
@@ -121,7 +119,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 				SnappyCompress: self.snappy}
 		}, self.dis, self.config)
 		c.Start()
-		log.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
+		log4go.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
 		self.clientsManager.Auth(turbo.NewGroupAuth(hp, ""), c)
 	}
 
@@ -133,7 +131,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		self.uri2Ips[uri] = core.NewRandomStrategy(hosts)
 	}
 
-	log.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)
+	log4go.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)
 	//清理掉不再使用client
 	usingIps := make(map[string]bool, 5)
 	for _, v := range self.uri2Ips {
@@ -147,12 +145,12 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		if !ok {
 			//不再使用了移除
 			self.clientsManager.DeleteClients(ip)
-			log.InfoLog("config_center", "MoaClientManager|RemoveUnUse Client|SUCC|%s", ip)
+			log4go.InfoLog("config_center", "MoaClientManager|RemoveUnUse Client|SUCC|%s", ip)
 		}
 	}
 	self.lock.Unlock()
 
-	log.InfoLog("config_center", "MoaClientManager|OnAddressChange|SUCC|%s|%v", uri, hosts)
+	log4go.InfoLog("config_center", "MoaClientManager|OnAddressChange|SUCC|%s|%v", uri, hosts)
 }
 
 //根据Uri获取连接
@@ -180,7 +178,7 @@ func (self *MoaClientManager) Destroy() {
 }
 
 //设置
-func (self *MoaClientManager) dis(ctx *turbo.TContext)error {
+func (self *MoaClientManager) dis(ctx *turbo.TContext) error {
 	p := ctx.Message
 	if p.Header.CmdType == core.PONG {
 		pipo := p.PayLoad.(core.PiPo)
