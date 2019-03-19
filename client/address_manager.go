@@ -1,11 +1,11 @@
 package client
 
 import (
+	"github.com/blackbeans/go-moa/core"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/blackbeans/go-moa/lb"
 	log "github.com/blackbeans/log4go"
 )
 
@@ -13,13 +13,13 @@ type IAddressListener func(uri string, hosts []string)
 
 type AddressManager struct {
 	serviceUris []string
-	registry    lb.IRegistry
+	registry    core.IRegistry
 	uri2Hosts   map[string][]string
 	lock        sync.RWMutex
 	listener    IAddressListener
 }
 
-func NewAddressManager(registry lb.IRegistry, uris []string, listener IAddressListener) *AddressManager {
+func NewAddressManager(registry core.IRegistry, uris []string, listener IAddressListener) *AddressManager {
 
 	uri2Hosts := make(map[string][]string, 2)
 	center := &AddressManager{serviceUris: uris,
@@ -52,7 +52,7 @@ func (self AddressManager) loadAvailableAddress() map[string][]string {
 	for _, uri := range self.serviceUris {
 		for i := 0; i < 3; i++ {
 			serviceUri, groupId := splitServiceUri(uri)
-			addrs, err := self.registry.GetService(serviceUri, lb.PROTOCOL, groupId)
+			addrs, err := self.registry.GetService(serviceUri, core.PROTOCOL, groupId)
 			if nil != err {
 				log.WarnLog("config_center", "AddressManager|loadAvailableAddress|FAIL|%s|%s", err, uri)
 				func() {
