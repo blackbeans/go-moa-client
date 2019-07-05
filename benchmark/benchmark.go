@@ -1,10 +1,11 @@
-package benchmark
+package main
 
 import (
+	"flag"
+	"github.com/blackbeans/go-moa/core"
+	"go-moa-client/client"
 	"os"
 	"os/signal"
-
-	"github.com/blackbeans/go-moa/core"
 )
 
 type IGoMoaDemo interface {
@@ -23,20 +24,49 @@ func (self GoMoaDemo) Ping() error {
 	return nil
 }
 
+type GoMoaDemoProxy struct {
+	SetName func(name string) error
+	Ping    func() error
+}
+
 func main() {
-	app := core.NewApplcation("conf/moa.toml", func() []core.Service {
-		return []core.Service{
-			core.Service{
-				ServiceUri: "/service/bibi/go-moa",
-				Instance:   GoMoaDemo{},
-				Interface:  (*IGoMoaDemo)(nil)}}
-	})
+	server := flag.Bool("server", true, "-server=true")
+	flag.Parse()
 
-	//设置
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Kill)
-	//kill
-	<-ch
-	app.DestroyApplication()
+	if *server {
 
+		app := core.NewApplcation("conf/moa.toml", func() []core.Service {
+			return []core.Service{
+				core.Service{
+					ServiceUri: "/service/go-moa",
+					Instance:   GoMoaDemo{},
+					Interface:  (*IGoMoaDemo)(nil)}}
+		})
+
+		//设置
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, os.Kill)
+		//kill
+		<-ch
+		app.DestroyApplication()
+	} else {
+		startClient()
+	}
+
+}
+
+func startClient() {
+	consumer := client.NewMoaConsumer("./conf/moa.toml",
+		[]client.Service{client.Service{
+			ServiceUri: "/service/go-moa",
+			Interface:  &GoMoaDemoProxy{}}})
+
+	for {
+		s, _ := consumer.GetService("/service/go-moa")
+		h := s.(*GoMoaDemoProxy)
+		err := h.SetName("a")
+		if nil != err {
+
+		}
+	}
 }

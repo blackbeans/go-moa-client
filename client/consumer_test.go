@@ -1,13 +1,12 @@
 package client
 
 import (
-	"testing"
-	"time"
-	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/go-moa/lb"
 	"errors"
 	"fmt"
+	"github.com/blackbeans/go-moa/core"
 	"net"
+	"testing"
+	"time"
 )
 
 type DemoResult struct {
@@ -31,7 +30,6 @@ type IUserService interface {
 	GetTime(t time.Time) error
 }
 
-
 type UserServiceDemo struct{}
 
 func (self UserServiceDemo) GetName(name string) (*DemoResult, error) {
@@ -50,7 +48,7 @@ func (self UserServiceDemo) Pong() (string, error) {
 	return "pong", nil
 }
 
-func(self UserServiceDemo)GetTime(t time.Time) error{
+func (self UserServiceDemo) GetTime(t time.Time) error {
 	return nil
 }
 
@@ -72,17 +70,16 @@ func (self UserServicePanic) Pong() (string, error) {
 	return "", nil
 }
 
-func(self UserServicePanic)GetTime(t time.Time) error{
+func (self UserServicePanic) GetTime(t time.Time) error {
 	return nil
 }
-
 
 var consumer *MoaConsumer
 
 func init() {
 
 	uinter := (*IUserService)(nil)
-	core.NewApplcation("../conf/moa.toml", func() []core.Service {
+	core.NewApplcation("../benchmark/conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/user-service",
@@ -102,7 +99,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	//等待5s注册地址
 	time.Sleep(5 * time.Second)
 
-	consumer := NewMoaConsumer("../conf/moa.toml",
+	consumer := NewMoaConsumer("../benchmark/conf/moa.toml",
 		[]Service{
 			Service{
 				ServiceUri: "/service/user-service",
@@ -123,10 +120,9 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 		t.Logf("Oops--------Hello,Buddy|Has Clients|%s|%v\n", a, err)
 	}
 
-
-	time := time.Unix(time.Now().UnixNano()/1000,0)
+	time := time.Unix(time.Now().UnixNano()/1000, 0)
 	err = h.GetTime(time)
-	if nil ==err {
+	if nil == err {
 		t.Logf("--------Should Error But not|%s\n", time)
 		t.FailNow()
 	}
@@ -145,7 +141,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 
 func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	b.StopTimer()
-	consumer := NewMoaConsumer("../conf/moa.toml",
+	consumer := NewMoaConsumer("../benchmark/conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -159,7 +155,6 @@ func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 		for pb.Next() {
 
 			a, err := h.GetName("a")
-
 			if nil != err || a.Uri != "/service/user-service" {
 				b.Fail()
 			}
@@ -169,8 +164,6 @@ func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	consumer.Destroy()
 }
 
-
-
 func TestClientChange(t *testing.T) {
 
 	ipaddress := ""
@@ -178,8 +171,8 @@ func TestClientChange(t *testing.T) {
 	if nil != err {
 		panic(err)
 	} else {
-		outter:
-			for _, inter := range inters {
+	outter:
+		for _, inter := range inters {
 			addrs, _ := inter.Addrs()
 			for _, addr := range addrs {
 				if ip, ok := addr.(*net.IPNet); ok && !ip.IP.IsLoopback() {
@@ -193,13 +186,12 @@ func TestClientChange(t *testing.T) {
 
 	}
 
-	if len(ipaddress)<=0{
+	if len(ipaddress) <= 0 {
 		panic("ip not found")
 	}
 
-
 	time.Sleep(5 * time.Second)
-	consumer := NewMoaConsumer("../conf/moa.toml",
+	consumer := NewMoaConsumer("../benchmark/conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -209,7 +201,7 @@ func TestClientChange(t *testing.T) {
 	if !ok {
 		t.FailNow()
 	}
-	fmt.Printf("/service/user-service----------%v\n",ips)
+	fmt.Printf("/service/user-service----------%v\n", ips)
 	exist := false
 	ips.Iterator(func(idx int, hp string) {
 		if hp == ipaddress+":13000" {
@@ -222,10 +214,10 @@ func TestClientChange(t *testing.T) {
 		return
 	}
 
-	t.Log("-----------Remove Node "+ ipaddress+":13000")
+	t.Log("-----------Remove Node " + ipaddress + ":13000")
 
 	succ := consumer.clientManager.addrManager.registry.UnRegisteService("/service/user-service",
-			ipaddress+":13000", lb.PROTOCOL, "")
+		ipaddress+":13000", core.PROTOCOL, "")
 	if !succ {
 		t.Fail()
 		return
@@ -245,4 +237,3 @@ func TestClientChange(t *testing.T) {
 	consumer.Destroy()
 	t.Log("TestClientChange FINISH ")
 }
-
