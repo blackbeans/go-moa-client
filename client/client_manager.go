@@ -48,7 +48,8 @@ func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
 			cluster.ReadBufferSize,
 			cluster.WriteChannelSize,
 			cluster.ReadChannelSize,
-			cluster.IdleTimeout)
+			cluster.IdleTimeout,
+			cluster.FutureSize)
 
 	manager.op = option
 	manager.clientsManager = turbo.NewClientManager(reconnect)
