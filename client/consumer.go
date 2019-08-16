@@ -250,7 +250,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	//如果调用超过1000ms，则打印日志
 	if rpcCost >= 1000 {
-		log.WarnLog("moa_client", "MoaConsumer|Invoke|SLOW|%s|%s|TimeMs[%d->%d->%d]", cmd.ServiceUri, cmd.Params.Method, wrapCost, selectCost, rpcCost)
+		log.WarnLog("moa_client", "MoaConsumer|Invoke|SLOW|%s#%s|%s|TimeMs[%d->%d->%d]",
+			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost)
 	}
 
 	resp := response.(core.MoaRawRespPacket)
