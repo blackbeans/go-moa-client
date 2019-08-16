@@ -8,10 +8,11 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/blackbeans/go-moa/core"
-	"github.com/blackbeans/turbo"
 	log "github.com/blackbeans/log4go"
+	"github.com/blackbeans/turbo"
 )
 
 type Service struct {
@@ -200,6 +201,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		return retVal
 	}
 
+	now := time.Now()
 	//1.组装请求协议
 	cmd := core.MoaReqPacket{}
 	cmd.ServiceUri = s.ServiceUri
@@ -220,6 +222,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 	cmd.Params.Args = args
 
+	wrapCost := time.Now().Sub(now) / (time.Millisecond)
 	//2.选取服务地址
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
 	c, err := self.clientManager.SelectClient(serviceUri, buff.String())
@@ -229,6 +232,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		return errFunc(err)
 
 	}
+	selectCost := time.Now().Sub(now) / (time.Millisecond)
 
 	//4.等待响应、超时、异常处理
 	req := turbo.NewPacket(core.REQ, nil)
@@ -240,6 +244,13 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		//response error and close this connection
 		log.ErrorLog("moa_client", "MoaConsumer|InvokeFail|%s|%s", err, cmd)
 		return errFunc(err)
+	}
+
+	rpcCost := time.Now().Sub(now) / (time.Millisecond)
+
+	//如果调用超过1000ms，则打印日志
+	if rpcCost >= 1000 {
+		log.WarnLog("moa_client", "MoaConsumer|Invoke|SLOW|%s|%s|TimeMs[%d->%d->%d]", cmd.ServiceUri, cmd.Params.Method, wrapCost, selectCost, rpcCost)
 	}
 
 	resp := response.(core.MoaRawRespPacket)

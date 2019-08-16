@@ -35,7 +35,7 @@ func main() {
 
 	if *server {
 
-		app := core.NewApplcation("conf/moa.toml", func() []core.Service {
+		app := core.NewApplication("conf/moa.toml", func() []core.Service {
 			return []core.Service{
 				core.Service{
 					ServiceUri: "/service/go-moa",
