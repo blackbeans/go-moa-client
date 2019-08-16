@@ -31,7 +31,7 @@ type MoaConsumer struct {
 
 func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 
-	options, err := core.LoadConfiruation(confPath)
+	options, err := core.LoadConfiguration(confPath)
 	if nil != err {
 		panic(err)
 	}
@@ -249,7 +249,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	rpcCost := time.Now().Sub(now) / (time.Millisecond)
 
 	//如果调用超过1000ms，则打印日志
-	if rpcCost >= 1000 && self.options.Client.SlowLog {
+	if rpcCost >= 1000 && *self.options.Client.SlowLog {
 		log.WarnLog("moa_client", "MoaConsumer|Invoke|SLOW|%s#%s|%s|TimeMs[%d->%d->%d]",
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost)
 	}
