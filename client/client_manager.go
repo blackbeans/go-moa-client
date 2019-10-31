@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -22,9 +23,10 @@ type MoaClientManager struct {
 	snappy         bool
 	lock           sync.RWMutex
 	config         *turbo.TConfig
+	ctx            context.Context
 }
 
-func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
+func NewMoaClientManager(ctx context.Context, option core.Option, uris []string) *MoaClientManager {
 
 	cluster := option.Clusters[option.Client.RunMode]
 	var reg core.IRegistry
@@ -38,7 +40,7 @@ func NewMoaClientManager(option core.Option, uris []string) *MoaClientManager {
 			return true, nil
 		})
 
-	manager := &MoaClientManager{}
+	manager := &MoaClientManager{ctx: ctx}
 	//参数
 	manager.config =
 		turbo.NewTConfig(
@@ -113,7 +115,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 		}
 		conn := connection.(*net.TCPConn)
 
-		c := turbo.NewTClient(conn, func() turbo.ICodec {
+		c := turbo.NewTClient(self.ctx, conn, func() turbo.ICodec {
 			return core.BinaryCodec{
 				MaxFrameLength: turbo.MAX_PACKET_BYTES,
 				SnappyCompress: self.snappy}

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,8 @@ type Service struct {
 }
 
 type MoaConsumer struct {
+	ctx           context.Context
+	closed        context.CancelFunc
 	services      map[string]core.Service
 	options       core.Option
 	clientManager *MoaClientManager
@@ -65,6 +68,7 @@ func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 	}
 	consumer.services = services
 	consumer.options = options
+	consumer.ctx, consumer.closed = context.WithCancel(context.Background())
 
 	pool := &sync.Pool{}
 	pool.New = func() interface{} {
@@ -75,7 +79,7 @@ func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 	for _, s := range services {
 		consumer.makeRpcFunc(s)
 	}
-	consumer.clientManager = NewMoaClientManager(options, uris)
+	consumer.clientManager = NewMoaClientManager(consumer.ctx, options, uris)
 	return consumer
 }
 
@@ -97,6 +101,7 @@ func splitServiceUri(serviceUri string) (uri, groupId string) {
 }
 
 func (self *MoaConsumer) Destroy() {
+	self.closed()
 	self.clientManager.Destroy()
 }
 
