@@ -247,7 +247,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	if nil != err {
 		//response error and close this connection
-		log.ErrorLog("moa_client", "MoaConsumer|InvokeFail|%s|%s", err, cmd)
+		log.ErrorLog("moa_client", "MoaConsumer|Invoke|Fail|%v|%s#%s|%s|%d|%d|%+v", err,
+			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, cmd)
 		return errFunc(err)
 	}
 
@@ -295,8 +296,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	} else {
 		//invoke Fail
 		log.ErrorLog("moa_client",
-			"MoaConsumer|RPC FAIL|%s|%s|%v",
-			s.ServiceUri, method, resp)
+			"MoaConsumer|Invoke|RPCFAIL|%s#%s|%s|TimeMs[%d->%d->%d]|%+v",
+			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost, resp)
 		err = errors.New(resp.Message)
 		return errFunc(err)
 	}
