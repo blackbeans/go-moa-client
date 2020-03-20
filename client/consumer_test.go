@@ -33,6 +33,12 @@ type IUserService interface {
 type UserServiceDemo struct{}
 
 func (self UserServiceDemo) GetName(name string) (*DemoResult, error) {
+
+	properties, ok := core.GetGoProperty()
+	if ok {
+		fmt.Println(properties)
+	}
+
 	return &DemoResult{[]string{"a", "b"}, "/service/user-service"}, nil
 }
 
@@ -79,7 +85,7 @@ var consumer *MoaConsumer
 func init() {
 
 	uinter := (*IUserService)(nil)
-	core.NewApplcation("../benchmark/conf/moa.toml", func() []core.Service {
+	core.NewApplication("../benchmark/conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/user-service",
@@ -111,6 +117,11 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	time.Sleep(10 * time.Second)
 	s, _ := consumer.GetService("/service/user-service")
 	h := s.(*UserService)
+
+	core.AttachGoProperies(map[string]string{
+		"Accept-Language": "zh_CN",
+	})
+	defer core.DetachGoProperties()
 	a, err := h.GetName("a")
 
 	if nil != err {

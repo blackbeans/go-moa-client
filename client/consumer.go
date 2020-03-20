@@ -239,6 +239,12 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	}
 	selectCost := time.Now().Sub(now) / (time.Millisecond)
 
+	//获取上下文的的属性
+	attchObj, ok := core.GetGoProperty()
+	if ok {
+		cmd.Properties = attchObj
+	}
+
 	//4.等待响应、超时、异常处理
 	req := turbo.NewPacket(core.REQ, nil)
 	req.PayLoad = cmd
