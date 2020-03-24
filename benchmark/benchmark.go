@@ -4,6 +4,7 @@ import (
 	"flag"
 	"github.com/blackbeans/go-moa-client/client"
 	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/log4go"
 	"os"
 	"os/signal"
 )
@@ -33,7 +34,7 @@ type GoMoaDemoProxy struct {
 func main() {
 	server := flag.Bool("server", true, "-server=true")
 	flag.Parse()
-
+	log4go.LoadConfiguration("conf/log.xml")
 	if *server {
 
 		app := core.NewApplication("conf/moa.toml", func() []core.Service {
@@ -65,15 +66,11 @@ func startClient() {
 
 	s, _ := consumer.GetService("/service/go-moa")
 	h := s.(*GoMoaDemoProxy)
-	for i := 0; i < 100; i++ {
-		go func() {
-			for {
-				_, err := h.SetName("a")
-				//fmt.Println(a)
-				if nil != err {
+	for {
+		_, err := h.SetName("a")
+		//fmt.Println(a)
+		if nil != err {
 
-				}
-			}
-		}()
+		}
 	}
 }

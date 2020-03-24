@@ -119,7 +119,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	s, _ := consumer.GetService("/service/user-service")
 	h := s.(*UserService)
 
-	ctx := core.AttachMoaProperies(context.Background(), "Accept-Language", "zh-CN")
+	ctx := core.AttachMoaProperty(context.Background(), "Accept-Language", "zh-CN")
 	a, err := h.GetName(ctx, "a")
 	if nil != err {
 		t.Logf("--------Hello,Buddy|No Clients|%s\n", err)
@@ -161,7 +161,7 @@ func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 
 		for pb.Next() {
-			ctx := core.AttachMoaProperies(context.Background(), "Accept-Language", "zh-CN")
+			ctx := core.AttachMoaProperty(context.Background(), "Accept-Language", "zh-CN")
 			a, err := h.GetName(ctx, "a")
 			if nil != err || a.Uri != "/service/user-service" {
 				b.Fail()
