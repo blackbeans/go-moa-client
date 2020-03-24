@@ -189,6 +189,8 @@ func (self *MoaConsumer) proxyMethod(s core.Service, htype reflect.Type, i int, 
 
 var errorType = reflect.TypeOf(make([]error, 1)).Elem()
 
+var typeOfContext = reflect.TypeOf(context.Background())
+
 //真正发起RPC调用的逻辑
 func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	in []reflect.Value, outType []reflect.Type) []reflect.Value {
@@ -213,16 +215,26 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	cmd.Params.Method = method
 	args := make([]interface{}, 0, 3)
 
-	buff := self.buffPool.Get().(*bytes.Buffer)
-	defer func() {
-		buff.Reset()
-		self.buffPool.Put(buff)
-	}()
-
+	hashid := ""
 	for i, arg := range in {
 		if i <= 0 {
-			buff.WriteString(arg.String())
+			//第一个参数如果是context则忽略作为调用参数，提取属性
+			if ok := typeOfContext.AssignableTo(arg.Type()); ok {
+				//获取头部写入的属性值
+				ctx := arg.Interface().(context.Context)
+				if props := ctx.Value(core.KEY_MOA_PROPERTIES); nil != props {
+					if v, ok := props.(map[string]string); ok {
+						cmd.Properties = v
+						//获取moa的hash值
+						if v, ok := cmd.Properties["hashid"]; ok {
+							hashid = v
+						}
+					}
+				}
+				continue
+			}
 		}
+
 		args = append(args, arg.Interface())
 	}
 	cmd.Params.Args = args
@@ -230,7 +242,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	wrapCost := time.Now().Sub(now) / (time.Millisecond)
 	//2.选取服务地址
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
-	c, err := self.clientManager.SelectClient(serviceUri, buff.String())
+	c, err := self.clientManager.SelectClient(serviceUri, hashid)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
@@ -238,12 +250,6 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	}
 	selectCost := time.Now().Sub(now) / (time.Millisecond)
-
-	//获取上下文的的属性
-	attchObj, ok := core.GetGoProperty()
-	if ok {
-		cmd.Properties = attchObj
-	}
 
 	//4.等待响应、超时、异常处理
 	req := turbo.NewPacket(core.REQ, nil)

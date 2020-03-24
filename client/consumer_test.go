@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/blackbeans/go-moa/core"
@@ -15,7 +16,7 @@ type DemoResult struct {
 }
 
 type UserService struct {
-	GetName func(serviceUri string) (*DemoResult, error)
+	GetName func(ctx context.Context, serviceUri string) (*DemoResult, error)
 	SetName func(name string) error
 	Ping    func() error
 	Pong    func() (string, error)
@@ -23,7 +24,7 @@ type UserService struct {
 }
 
 type IUserService interface {
-	GetName(name string) (*DemoResult, error)
+	GetName(ctx context.Context, name string) (*DemoResult, error)
 	SetName(name string) error
 	Ping() error
 	Pong() (string, error)
@@ -32,12 +33,12 @@ type IUserService interface {
 
 type UserServiceDemo struct{}
 
-func (self UserServiceDemo) GetName(name string) (*DemoResult, error) {
+func (self UserServiceDemo) GetName(ctx context.Context, name string) (*DemoResult, error) {
 
-	properties, ok := core.GetGoProperty()
-	if ok {
-		fmt.Println(properties)
-	}
+	//properties, ok := core.GetMoaProperty(ctx,"Accept-Language")
+	//if ok {
+	//fmt.Printf("-------------properties:%v\n",properties)
+	//}
 
 	return &DemoResult{[]string{"a", "b"}, "/service/user-service"}, nil
 }
@@ -60,7 +61,7 @@ func (self UserServiceDemo) GetTime(t time.Time) error {
 
 type UserServicePanic struct{}
 
-func (self UserServicePanic) GetName(name string) (*DemoResult, error) {
+func (self UserServicePanic) GetName(ctx context.Context, name string) (*DemoResult, error) {
 	return nil, errors.New("真的抛错了")
 }
 
@@ -114,16 +115,12 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 				ServiceUri: "/service/user-service-panic",
 				Interface:  &UserServicePanic{},
 				GroupIds:   []string{"s-mts-group"}}})
-	time.Sleep(10 * time.Second)
+
 	s, _ := consumer.GetService("/service/user-service")
 	h := s.(*UserService)
 
-	core.AttachGoProperies(map[string]string{
-		"Accept-Language": "zh_CN",
-	})
-	defer core.DetachGoProperties()
-	a, err := h.GetName("a")
-
+	ctx := core.AttachMoaProperies(context.Background(), "Accept-Language", "zh-CN")
+	a, err := h.GetName(ctx, "a")
 	if nil != err {
 		t.Logf("--------Hello,Buddy|No Clients|%s\n", err)
 		t.FailNow()
@@ -140,7 +137,7 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 
 	sp, _ := consumer.GetServiceWithGroupid("/service/user-service-panic", "s-mts-group")
 	panicService := sp.(*UserServicePanic)
-	a, err = panicService.GetName("a")
+	a, err = panicService.GetName(context.TODO(), "a")
 	t.Logf("--------Hello,Buddy|%s|error(%s)\n", a, err)
 	if nil == err || nil != a {
 		t.Fail()
@@ -157,15 +154,15 @@ func BenchmarkMakeRpcFuncParallel(b *testing.B) {
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
 	time.Sleep(5 * time.Second)
+
 	s, _ := consumer.GetService("/service/user-service")
 	h := s.(*UserService)
 	b.StartTimer()
-
 	b.RunParallel(func(pb *testing.PB) {
 
 		for pb.Next() {
-
-			a, err := h.GetName("a")
+			ctx := core.AttachMoaProperies(context.Background(), "Accept-Language", "zh-CN")
+			a, err := h.GetName(ctx, "a")
 			if nil != err || a.Uri != "/service/user-service" {
 				b.Fail()
 			}

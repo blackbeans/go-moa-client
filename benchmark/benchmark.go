@@ -2,22 +2,23 @@ package main
 
 import (
 	"flag"
+	"github.com/blackbeans/go-moa-client/client"
 	"github.com/blackbeans/go-moa/core"
-	"go-moa-client/client"
 	"os"
 	"os/signal"
 )
 
 type IGoMoaDemo interface {
-	SetName(name string) error
+	SetName(name string) (string, error)
 	Ping() error
 }
 
 type GoMoaDemo struct {
 }
 
-func (self GoMoaDemo) SetName(name string) error {
-	return nil
+func (self GoMoaDemo) SetName(name string) (string, error) {
+
+	return name, nil
 }
 
 func (self GoMoaDemo) Ping() error {
@@ -25,7 +26,7 @@ func (self GoMoaDemo) Ping() error {
 }
 
 type GoMoaDemoProxy struct {
-	SetName func(name string) error
+	SetName func(name string) (string, error)
 	Ping    func() error
 }
 
@@ -51,6 +52,7 @@ func main() {
 		app.DestroyApplication()
 	} else {
 		startClient()
+		select {}
 	}
 
 }
@@ -61,12 +63,17 @@ func startClient() {
 			ServiceUri: "/service/go-moa",
 			Interface:  &GoMoaDemoProxy{}}})
 
-	for {
-		s, _ := consumer.GetService("/service/go-moa")
-		h := s.(*GoMoaDemoProxy)
-		err := h.SetName("a")
-		if nil != err {
+	s, _ := consumer.GetService("/service/go-moa")
+	h := s.(*GoMoaDemoProxy)
+	for i := 0; i < 100; i++ {
+		go func() {
+			for {
+				_, err := h.SetName("a")
+				//fmt.Println(a)
+				if nil != err {
 
-		}
+				}
+			}
+		}()
 	}
 }
