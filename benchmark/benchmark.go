@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/blackbeans/go-moa-client/client"
 	"github.com/blackbeans/go-moa/core"
@@ -27,7 +28,7 @@ func (self GoMoaDemo) Ping() error {
 }
 
 type GoMoaDemoProxy struct {
-	SetName func(name string) (string, error)
+	SetName func(ctx context.Context, name string) (string, error)
 	Ping    func() error
 }
 
@@ -67,7 +68,8 @@ func startClient() {
 	s, _ := consumer.GetService("/service/go-moa")
 	h := s.(*GoMoaDemoProxy)
 	for {
-		_, err := h.SetName("a")
+		ctx := core.AttachMoaProperty(context.Background(), "Accept-Language", "zh-CN")
+		_, err := h.SetName(ctx, "a")
 		//fmt.Println(a)
 		if nil != err {
 
