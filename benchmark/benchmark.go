@@ -70,7 +70,6 @@ func startClient() {
 	for {
 		ctx := core.AttachMoaProperty(context.Background(), "Accept-Language", "zh-CN")
 		_, err := h.SetName(ctx, "a")
-		//fmt.Println(a)
 		if nil != err {
 
 		}

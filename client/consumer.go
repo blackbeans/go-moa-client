@@ -189,7 +189,7 @@ func (self *MoaConsumer) proxyMethod(s core.Service, htype reflect.Type, i int, 
 
 var errorType = reflect.TypeOf(make([]error, 1)).Elem()
 
-var typeOfContext = reflect.TypeOf(context.Background())
+var typeOfContext = reflect.TypeOf(new(context.Context)).Elem()
 
 //真正发起RPC调用的逻辑
 func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
@@ -219,7 +219,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	for i, arg := range in {
 		if i <= 0 {
 			//第一个参数如果是context则忽略作为调用参数，提取属性
-			if ok := typeOfContext.AssignableTo(arg.Type()); ok {
+			if ok := arg.Type().Implements(typeOfContext); ok {
 				//获取头部写入的属性值
 				ctx := arg.Interface().(context.Context)
 				if props := ctx.Value(core.KEY_MOA_PROPERTIES); nil != props {
