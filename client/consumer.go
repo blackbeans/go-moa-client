@@ -189,6 +189,8 @@ func (self *MoaConsumer) proxyMethod(s core.Service, htype reflect.Type, i int, 
 
 var errorType = reflect.TypeOf(make([]error, 1)).Elem()
 
+var typeOfContext = reflect.TypeOf(new(context.Context)).Elem()
+
 //真正发起RPC调用的逻辑
 func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	in []reflect.Value, outType []reflect.Type) []reflect.Value {
@@ -213,16 +215,26 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	cmd.Params.Method = method
 	args := make([]interface{}, 0, 3)
 
-	buff := self.buffPool.Get().(*bytes.Buffer)
-	defer func() {
-		buff.Reset()
-		self.buffPool.Put(buff)
-	}()
-
+	hashid := ""
 	for i, arg := range in {
 		if i <= 0 {
-			buff.WriteString(arg.String())
+			//第一个参数如果是context则忽略作为调用参数，提取属性
+			if ok := arg.Type().Implements(typeOfContext); ok {
+				//获取头部写入的属性值
+				ctx := arg.Interface().(context.Context)
+				if props := ctx.Value(core.KEY_MOA_PROPERTIES); nil != props {
+					if v, ok := props.(map[string]string); ok {
+						cmd.Properties = v
+						//获取moa的hash值
+						if v, ok := cmd.Properties["hashid"]; ok {
+							hashid = v
+						}
+					}
+				}
+				continue
+			}
 		}
+
 		args = append(args, arg.Interface())
 	}
 	cmd.Params.Args = args
@@ -230,7 +242,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	wrapCost := time.Now().Sub(now) / (time.Millisecond)
 	//2.选取服务地址
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
-	c, err := self.clientManager.SelectClient(serviceUri, buff.String())
+	c, err := self.clientManager.SelectClient(serviceUri, hashid)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
@@ -247,7 +259,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	if nil != err {
 		//response error and close this connection
-		log.ErrorLog("moa_client", "MoaConsumer|InvokeFail|%s|%s", err, cmd)
+		log.ErrorLog("moa_client", "MoaConsumer|Invoke|Fail|%v|%s#%s|%s|%d|%d|%+v", err,
+			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, cmd)
 		return errFunc(err)
 	}
 
@@ -295,8 +308,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	} else {
 		//invoke Fail
 		log.ErrorLog("moa_client",
-			"MoaConsumer|RPC FAIL|%s|%s|%v",
-			s.ServiceUri, method, resp)
+			"MoaConsumer|Invoke|RPCFAIL|%s#%s|%s|TimeMs[%d->%d->%d]|%+v",
+			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost, resp)
 		err = errors.New(resp.Message)
 		return errFunc(err)
 	}
