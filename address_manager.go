@@ -1,4 +1,4 @@
-package client
+package go_moa_client
 
 import (
 	"github.com/blackbeans/go-moa/core"

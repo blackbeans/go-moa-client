@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/blackbeans/go-moa-client/client"
+	"github.com/blackbeans/go-moa-client"
 	"github.com/blackbeans/go-moa/core"
 	"os"
 	"os/signal"
@@ -56,8 +56,8 @@ func main() {
 }
 
 func startClient() {
-	consumer := client.NewMoaConsumer("./conf/moa.toml",
-		[]client.Service{client.Service{
+	consumer := go_moa_client.NewMoaConsumer("./conf/moa.toml",
+		[]go_moa_client.Service{go_moa_client.Service{
 			ServiceUri: "/service/go-moa",
 			Interface:  &GoMoaDemoProxy{}}})
 
