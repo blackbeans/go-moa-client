@@ -5,7 +5,7 @@
         $Zookeeper/bin/zkServer.sh start
 
     ``` 
-    go get  github.com/blackbeans/go-moa-client/client
+    go get  github.com/blackbeans/go-moa-client
     
     ```
 
