@@ -56,8 +56,8 @@ func main() {
 }
 
 func startClient() {
-	consumer := go_moa_client.NewMoaConsumer("./conf/moa.toml",
-		[]go_moa_client.Service{go_moa_client.Service{
+	consumer := moaclient.NewMoaConsumer("./conf/moa.toml",
+		[]moaclient.Service{moaclient.Service{
 			ServiceUri: "/service/go-moa",
 			Interface:  &GoMoaDemoProxy{}}})
 

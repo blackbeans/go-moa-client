@@ -1,4 +1,4 @@
-package go_moa_client
+package moaclient
 
 import (
 	"context"
