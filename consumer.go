@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa"
 	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo"
 )

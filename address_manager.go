@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa"
 	"sort"
 	"sync"
 	"time"

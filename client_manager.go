@@ -11,13 +11,13 @@ import (
 
 	"github.com/blackbeans/log4go"
 
-	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa"
 	"github.com/blackbeans/turbo"
 )
 
 type MoaClientManager struct {
 	clientsManager *turbo.ClientManager
-	uri2Ips        map[string] /*uri*/ core.Strategy
+	uri2Ips        map[string] /*uri*/ Strategy
 	addrManager    *AddressManager
 	op             core.Option
 	snappy         bool
@@ -55,7 +55,7 @@ func NewMoaClientManager(ctx context.Context, option core.Option, uris []string)
 
 	manager.op = option
 	manager.clientsManager = turbo.NewClientManager(reconnect)
-	manager.uri2Ips = make(map[string]core.Strategy, 2)
+	manager.uri2Ips = make(map[string]Strategy, 2)
 	if strings.ToLower(option.Client.Compress) == "snappy" {
 		manager.snappy = true
 	}
@@ -126,11 +126,11 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 	}
 
 	if self.op.Client.SelectorStrategy == core.STRATEGY_KETAMA {
-		self.uri2Ips[uri] = core.NewKetamaStrategy(hosts)
+		self.uri2Ips[uri] = NewKetamaStrategy(hosts)
 	} else if self.op.Client.SelectorStrategy == core.STRATEGY_RANDOM {
-		self.uri2Ips[uri] = core.NewRandomStrategy(hosts)
+		self.uri2Ips[uri] = NewRandomStrategy(hosts)
 	} else {
-		self.uri2Ips[uri] = core.NewRandomStrategy(hosts)
+		self.uri2Ips[uri] = NewRandomStrategy(hosts)
 	}
 
 	log4go.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)

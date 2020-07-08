@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/blackbeans/go-moa/core"
+	"github.com/blackbeans/go-moa"
 	"net"
 	"testing"
 	"time"
@@ -83,7 +83,7 @@ func (self UserServicePanic) GetTime(t time.Time) error {
 
 var consumer *MoaConsumer
 
-func init() {
+func initMoaServer() {
 
 	uinter := (*IUserService)(nil)
 	core.NewApplication("../benchmark/conf/moa.toml", func() []core.Service {
