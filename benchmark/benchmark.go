@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
+	"github.com/blackbeans/go-moa"
 	"github.com/blackbeans/go-moa-client"
-	"github.com/blackbeans/go-moa/core"
 	"os"
 	"os/signal"
 )
