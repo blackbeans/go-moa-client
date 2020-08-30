@@ -17,11 +17,11 @@ import (
 
 type MoaClientManager struct {
 	clientsManager *turbo.ClientManager
-	uri2Ips        map[string] /*uri*/ Strategy
+	uri2Ips        *sync.Map //map[string] /*uri*/ Strategy
+	addrToTClient  *sync.Map // address to  tclient
 	addrManager    *AddressManager
 	op             core.Option
 	snappy         bool
-	lock           sync.RWMutex
 	config         *turbo.TConfig
 	ctx            context.Context
 }
@@ -55,7 +55,8 @@ func NewMoaClientManager(ctx context.Context, option core.Option, uris []string)
 
 	manager.op = option
 	manager.clientsManager = turbo.NewClientManager(reconnect)
-	manager.uri2Ips = make(map[string]Strategy, 2)
+	manager.uri2Ips = &sync.Map{}
+	manager.addrToTClient = &sync.Map{}
 	if strings.ToLower(option.Client.Compress) == "snappy" {
 		manager.snappy = true
 	}
@@ -96,8 +97,6 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 	log4go.WarnLog("config_center", "OnAddressChange|%s|%s", uri, hosts)
 	//新增地址
 	addHostport := make([]string, 0, 2)
-
-	self.lock.Lock()
 	//寻找新增连接
 	for _, ip := range hosts {
 		exist := self.clientsManager.FindTClient(ip)
@@ -107,72 +106,83 @@ func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
 	}
 
 	for _, hp := range addHostport {
+		hostport := hp
+		newFuture := turbo.NewFutureTask(func(ctx context.Context) (interface{}, error) {
+			connection, err := net.DialTimeout("tcp", hostport, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout*5)
+			if nil != err {
+				log4go.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hostport, err)
+				return nil, err
+			}
+			conn := connection.(*net.TCPConn)
 
-		connection, err := net.DialTimeout("tcp", hp, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout*5)
-		if nil != err {
-			log4go.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hp, err)
-			continue
+			c := turbo.NewTClient(self.ctx, conn, func() turbo.ICodec {
+				return core.BinaryCodec{
+					MaxFrameLength: turbo.MAX_PACKET_BYTES,
+					SnappyCompress: self.snappy}
+			}, self.dis, self.config)
+			c.Start()
+			log4go.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hostport)
+			self.clientsManager.Auth(turbo.NewGroupAuth(hostport, ""), c)
+			return c, nil
+		})
+
+		//避免重复创建，如果已经存在的不需要做任何事情，如果不存在那么就需要主动执行一次
+		_, loaded := self.addrToTClient.LoadOrStore(hostport, newFuture)
+		if !loaded {
+			newFuture.Run(self.ctx)
 		}
-		conn := connection.(*net.TCPConn)
-
-		c := turbo.NewTClient(self.ctx, conn, func() turbo.ICodec {
-			return core.BinaryCodec{
-				MaxFrameLength: turbo.MAX_PACKET_BYTES,
-				SnappyCompress: self.snappy}
-		}, self.dis, self.config)
-		c.Start()
-		log4go.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hp)
-		self.clientsManager.Auth(turbo.NewGroupAuth(hp, ""), c)
 	}
 
 	if self.op.Client.SelectorStrategy == core.STRATEGY_KETAMA {
-		self.uri2Ips[uri] = NewKetamaStrategy(hosts)
+		self.uri2Ips.Store(uri, NewKetamaStrategy(hosts))
 	} else if self.op.Client.SelectorStrategy == core.STRATEGY_RANDOM {
-		self.uri2Ips[uri] = NewRandomStrategy(hosts)
+		self.uri2Ips.Store(uri, NewRandomStrategy(hosts))
 	} else {
-		self.uri2Ips[uri] = NewRandomStrategy(hosts)
+		self.uri2Ips.Store(uri, NewRandomStrategy(hosts))
 	}
 
 	log4go.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, hosts)
 	//清理掉不再使用client
 	usingIps := make(map[string]bool, 5)
-	for _, v := range self.uri2Ips {
-		v.Iterator(func(i int, ip string) {
+	self.uri2Ips.Range(func(key, value interface{}) bool {
+		strategy := value.(Strategy)
+		strategy.Iterator(func(i int, ip string) {
 			usingIps[ip] = true
 		})
-	}
-
+		return true
+	})
 	for ip := range self.clientsManager.ClientsClone() {
 		_, ok := usingIps[ip]
 		if !ok {
 			//不再使用了移除
+			self.addrToTClient.Delete(ip)
 			self.clientsManager.DeleteClients(ip)
 			log4go.InfoLog("config_center", "MoaClientManager|RemoveUnUse Client|SUCC|%s", ip)
 		}
 	}
-	self.lock.Unlock()
-
 	log4go.InfoLog("config_center", "MoaClientManager|OnAddressChange|SUCC|%s|%v", uri, hosts)
 }
 
 //根据Uri获取连接
 func (self *MoaClientManager) SelectClient(uri string, key string) (*turbo.TClient, error) {
 
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-
-	strategy, ok := self.uri2Ips[uri]
+	strategy, ok := self.uri2Ips.Load(uri)
 	if ok {
-		ip := strategy.Select(key)
+		ip := strategy.(Strategy).Select(key)
 		if len(ip) > 0 {
-			p := self.clientsManager.FindTClient(ip)
-			if nil != p {
-				return p, nil
+			p, loaded := self.addrToTClient.Load(ip)
+			if loaded && nil != p {
+				future := p.(*turbo.FutureTask)
+				tclient, err := future.Get()
+				if nil != err {
+					return nil, err
+				}
+
+				return tclient.(*turbo.TClient), nil
 			}
 		}
 	}
 	return nil, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))
-
 }
 
 func (self *MoaClientManager) Destroy() {
