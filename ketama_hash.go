@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	core "github.com/blackbeans/go-moa"
 	"sort"
 )
 
@@ -14,29 +15,29 @@ func (p UIntSlice) Less(i, j int) bool { return p[i] < p[j] }
 func (p UIntSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 type Ketama struct {
-	node         int             // phsical node number
-	vnode        int             // virual node number
-	nodes        []uint          // nodes
-	nodesMapping map[uint]string // nodes maping
+	node         int                       // phsical node number
+	vnode        int                       // virual node number
+	nodes        []uint                    // nodes
+	nodesMapping map[uint]core.ServiceMeta // nodes maping
 }
 
-func NewKetama(node []string, vnode int) *Ketama {
+func NewKetama(node []core.ServiceMeta, vnode int) *Ketama {
 	ketama := &Ketama{}
 	ketama.node = len(node)
 	ketama.vnode = vnode
 	ketama.nodes = []uint{}
-	ketama.nodesMapping = map[uint]string{}
+	ketama.nodesMapping = map[uint]core.ServiceMeta{}
 
 	ketama.initCircle(node)
 	return ketama
 }
 
 // init consistent hashing circle
-func (k *Ketama) initCircle(nodes []string) {
+func (k *Ketama) initCircle(nodes []core.ServiceMeta) {
 	h := NewMurmur3C()
 	for _, n := range nodes {
 		for i := 0; i < k.vnode; i++ {
-			vnode := fmt.Sprintf("%s#%d", n, i)
+			vnode := fmt.Sprintf("%s#%d", n.HostPort, i)
 			h.Write([]byte(vnode))
 			vpos := uint(h.Sum32())
 			k.nodes = append(k.nodes, vpos)
@@ -49,9 +50,9 @@ func (k *Ketama) initCircle(nodes []string) {
 }
 
 // Node get a consistent hashing node by key
-func (k *Ketama) Node(key string) string {
+func (k *Ketama) Node(key string) core.ServiceMeta {
 	if len(k.nodes) == 0 {
-		return ""
+		return core.ServiceMeta{}
 	}
 	h := NewMurmur3C()
 	h.Write([]byte(key))

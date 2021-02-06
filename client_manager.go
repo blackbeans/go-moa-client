@@ -93,15 +93,15 @@ func (self *MoaClientManager) CheckAlive() {
 	}
 }
 
-func (self *MoaClientManager) OnAddressChange(uri string, hosts []string) {
+func (self *MoaClientManager) OnAddressChange(uri string, hosts []core.ServiceMeta) {
 	log4go.WarnLog("config_center", "OnAddressChange|%s|%s", uri, hosts)
 	//新增地址
 	addHostport := make([]string, 0, 2)
 	//寻找新增连接
-	for _, ip := range hosts {
-		exist := self.clientsManager.FindTClient(ip)
+	for _, host := range hosts {
+		exist := self.clientsManager.FindTClient(host.HostPort)
 		if nil == exist {
-			addHostport = append(addHostport, ip)
+			addHostport = append(addHostport, host.HostPort)
 		}
 	}
 
