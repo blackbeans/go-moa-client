@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/blackbeans/go-moa"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/blackbeans/go-moa"
 )
 
 type DemoResult struct {
@@ -81,12 +82,10 @@ func (self UserServicePanic) GetTime(t time.Time) error {
 	return nil
 }
 
-var consumer *MoaConsumer
-
-func initMoaServer() {
+func initMoaServer() *core.Application {
 
 	uinter := (*IUserService)(nil)
-	core.NewApplication("../benchmark/conf/moa.toml", func() []core.Service {
+	return core.NewApplication("./benchmark/conf/moa.toml", func() []core.Service {
 		return []core.Service{
 			core.Service{
 				ServiceUri: "/service/user-service",
@@ -102,11 +101,12 @@ func initMoaServer() {
 }
 
 func TestNoGroupMakeRpcFunc(t *testing.T) {
-
+	app := initMoaServer()
+	defer app.DestroyApplication()
 	//等待5s注册地址
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
-	consumer := NewMoaConsumer("../benchmark/conf/moa.toml",
+	consumer := NewMoaConsumer("./benchmark/conf/moa.toml",
 		[]Service{
 			Service{
 				ServiceUri: "/service/user-service",
@@ -147,31 +147,6 @@ func TestNoGroupMakeRpcFunc(t *testing.T) {
 	consumer.Destroy()
 }
 
-func BenchmarkMakeRpcFuncParallel(b *testing.B) {
-	b.StopTimer()
-	consumer := NewMoaConsumer("../benchmark/conf/moa.toml",
-		[]Service{Service{
-			ServiceUri: "/service/user-service",
-			Interface:  &UserService{}}})
-	time.Sleep(5 * time.Second)
-
-	s, _ := consumer.GetService("/service/user-service")
-	h := s.(*UserService)
-	b.StartTimer()
-	b.RunParallel(func(pb *testing.PB) {
-
-		for pb.Next() {
-			ctx := core.AttachMoaProperty(context.Background(), "Accept-Language", "zh-CN")
-			a, err := h.GetName(ctx, "a")
-			if nil != err || a.Uri != "/service/user-service" {
-				b.Fail()
-			}
-		}
-	})
-	b.StopTimer()
-	consumer.Destroy()
-}
-
 func TestClientChange(t *testing.T) {
 
 	ipaddress := ""
@@ -198,21 +173,23 @@ func TestClientChange(t *testing.T) {
 		panic("ip not found")
 	}
 
-	time.Sleep(5 * time.Second)
-	consumer := NewMoaConsumer("../benchmark/conf/moa.toml",
+	app := initMoaServer()
+	defer app.DestroyApplication()
+	time.Sleep(10 * time.Second)
+	consumer := NewMoaConsumer("./benchmark/conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
 
 	time.Sleep(10 * time.Second)
-	ips, ok := consumer.clientManager.uri2Ips["/service/user-service"]
+	ips, ok := consumer.clientManager.onlineUri2Ips.Load("/service/user-service")
 	if !ok {
 		t.FailNow()
 	}
 	fmt.Printf("/service/user-service----------%v\n", ips)
 	exist := false
-	ips.Iterator(func(idx int, hp string) {
-		if hp == ipaddress+":13000" {
+	ips.(Strategy).Iterator(func(idx int, hp core.ServiceMeta) {
+		if hp.HostPort == ipaddress+":13000" {
 			exist = true
 		}
 	})
@@ -231,10 +208,10 @@ func TestClientChange(t *testing.T) {
 		return
 	}
 	time.Sleep(15 * time.Second)
-	ips, ok = consumer.clientManager.uri2Ips["/service/user-service"]
+	ips, ok = consumer.clientManager.onlineUri2Ips.Load("/service/user-service")
 	exist = false
-	ips.Iterator(func(idx int, hp string) {
-		if hp == ipaddress+":13000" {
+	ips.(Strategy).Iterator(func(idx int, hp core.ServiceMeta) {
+		if hp.HostPort == ipaddress+":13000" {
 			exist = true
 		}
 	})

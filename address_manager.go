@@ -1,11 +1,12 @@
 package client
 
 import (
-	"github.com/blackbeans/go-moa"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/blackbeans/go-moa"
 
 	log "github.com/blackbeans/log4go"
 )
@@ -29,6 +30,11 @@ func NewAddressManager(registry core.IRegistry, uris []string, listener IAddress
 		listener:     listener}
 
 	center.uri2Services = uri2Services
+	//需要定时拉取服务地址
+	hosts := center.loadAvailableAddress()
+	center.lock.Lock()
+	center.uri2Services = hosts
+	center.lock.Unlock()
 	go func() {
 		for {
 			time.Sleep(5 * time.Second)
@@ -58,14 +64,12 @@ func (self *AddressManager) loadAvailableAddress() map[string][]core.ServiceMeta
 			addrs, err := self.registry.GetService(serviceUri, core.PROTOCOL, groupId)
 			if nil != err {
 				log.WarnLog("config_center", "AddressManager|loadAvailableAddress|FAIL|%s|%s", err, uri)
-				func() {
-					self.lock.RLock()
-					defer self.lock.RUnlock()
-					oldAddrs, ok := self.uri2Services[uri]
-					if ok {
-						hosts[uri] = oldAddrs
-					}
-				}()
+				self.lock.RLock()
+				oldAddrs, ok := self.uri2Services[uri]
+				if ok {
+					hosts[uri] = oldAddrs
+				}
+				self.lock.RUnlock()
 			} else {
 
 				if len(addrs) > 0 {

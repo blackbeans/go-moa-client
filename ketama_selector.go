@@ -6,9 +6,9 @@ import (
 )
 
 type Strategy interface {
-	Select(key string) string
-	ReHash(nodes []string)
-	Iterator(f func(idx int, node string))
+	Select(key string) core.ServiceMeta
+	ReHash(nodes []core.ServiceMeta)
+	Iterator(f func(idx int, node core.ServiceMeta))
 }
 
 type KetamaStrategy struct {
