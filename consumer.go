@@ -215,34 +215,31 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	cmd.Params.Method = method
 	args := make([]interface{}, 0, 3)
 
-	hashid := ""
+	//获取设置的属性
+	var invokeCtx = context.TODO()
 	for i, arg := range in {
 		if i <= 0 {
 			//第一个参数如果是context则忽略作为调用参数，提取属性
 			if ok := arg.Type().Implements(typeOfContext); ok {
 				//获取头部写入的属性值
-				ctx := arg.Interface().(context.Context)
-				if props := ctx.Value(core.KEY_MOA_PROPERTIES); nil != props {
+				invokeCtx = arg.Interface().(context.Context)
+				if props := invokeCtx.Value(core.KEY_MOA_PROPERTIES); nil != props {
 					if v, ok := props.(map[string]string); ok {
 						cmd.Properties = v
-						//获取moa的hash值
-						if v, ok := cmd.Properties["hashid"]; ok {
-							hashid = v
-						}
 					}
 				}
 				continue
 			}
 		}
-
 		args = append(args, arg.Interface())
 	}
+
 	cmd.Params.Args = args
 
 	wrapCost := time.Now().Sub(now) / (time.Millisecond)
 	//2.选取服务地址
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
-	c, err := self.clientManager.SelectClient(serviceUri, hashid)
+	c, err := self.clientManager.SelectClient(invokeCtx, serviceUri)
 	if nil != err {
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
