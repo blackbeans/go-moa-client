@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackbeans/go-moa"
+	core "github.com/blackbeans/go-moa"
 	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo"
 )
@@ -239,8 +239,10 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	wrapCost := time.Now().Sub(now) / (time.Millisecond)
 	//2.选取服务地址
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
-	c, err := self.clientManager.SelectClient(invokeCtx, serviceUri)
+	c, serviceMeta, err := self.clientManager.SelectClient(invokeCtx, serviceUri)
 	if nil != err {
+		// 负反馈，降低其优先级，，减少对其的调用，只有 优先级随机manager 真正实现
+		self.clientManager.NegativeFeedback(invokeCtx, serviceUri, serviceMeta)
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
 		return errFunc(err)
@@ -258,6 +260,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		//response error and close this connection
 		log.ErrorLog("moa_client", "MoaConsumer|Invoke|Fail|%v|%s#%s|%s|%d|%d|%+v", err,
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, cmd)
+
 		return errFunc(err)
 	}
 
@@ -265,6 +268,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 
 	//如果调用超过1000ms，则打印日志
 	if rpcCost >= 1000 && *self.options.Client.SlowLog {
+		// 超时负反馈，降低其优先级，减少对其的调用，只有 优先级随机manager 真正实现
+		self.clientManager.NegativeFeedback(invokeCtx, serviceUri, serviceMeta)
 		log.WarnLog("moa_client", "MoaConsumer|Invoke|SLOW|%s#%s|%s|TimeMs[%d->%d->%d]",
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost)
 	}

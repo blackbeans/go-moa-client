@@ -11,7 +11,7 @@ import (
 
 	"github.com/blackbeans/log4go"
 
-	"github.com/blackbeans/go-moa"
+	core "github.com/blackbeans/go-moa"
 	"github.com/blackbeans/turbo"
 )
 
@@ -152,6 +152,9 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 	} else if self.op.Client.SelectorStrategy == core.STRATEGY_RANDOM {
 		self.onlineUri2Ips.Store(uri, NewRandomStrategy(onlineServices))
 		self.preUri2Ips.Store(uri, NewRandomStrategy(preServices))
+	} else if self.op.Client.SelectorStrategy == "priority_random" {
+		self.onlineUri2Ips.Store(uri, NewPriorityRandomStrategy(onlineServices))
+		self.preUri2Ips.Store(uri, NewPriorityRandomStrategy(preServices))
 	} else {
 		self.onlineUri2Ips.Store(uri, NewRandomStrategy(onlineServices))
 		self.preUri2Ips.Store(uri, NewRandomStrategy(preServices))
@@ -188,7 +191,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 }
 
 //根据Uri获取连接
-func (self *MoaClientManager) SelectClient(ctx context.Context, uri string) (*turbo.TClient, error) {
+func (self *MoaClientManager) SelectClient(ctx context.Context, uri string) (*turbo.TClient, core.ServiceMeta, error) {
 
 	//获取moa的hash值
 	hashid, _ := core.GetMoaProperty(ctx, core.KEY_MOA_PROPERTY_HASHID)
@@ -211,15 +214,35 @@ func (self *MoaClientManager) SelectClient(ctx context.Context, uri string) (*tu
 					future := p.(*turbo.FutureTask)
 					tclient, err := future.Get()
 					if nil != err {
-						return nil, err
+						return nil, serviceMeta, err
 					}
 
-					return tclient.(*turbo.TClient), nil
+					return tclient.(*turbo.TClient), serviceMeta, nil
 				}
 			}
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))
+	return nil, core.ServiceMeta{}, errors.New(fmt.Sprintf("NO CLIENT FOR %s", uri))
+}
+
+func (self *MoaClientManager) NegativeFeedback(ctx context.Context, uri string, serviceMeta core.ServiceMeta) {
+	_, isPreEnv := core.GetMoaProperty(ctx, core.KEY_MOA_PROPERTY_ENV_PRE)
+
+	//默认只有线上的uri2Ips
+	nodes := []*sync.Map{self.onlineUri2Ips}
+	if isPreEnv {
+		nodes = []*sync.Map{self.preUri2Ips, self.onlineUri2Ips}
+	}
+
+	//先找pre的节点，如果pre的节点没有找到合法的地址，那么久找线上的节点
+	for _, uri2Ips := range nodes {
+		_strategy, ok := uri2Ips.Load(uri)
+		if ok {
+			strategy := _strategy.(Strategy)
+			strategy.NegativeFeedback(serviceMeta)
+			return
+		}
+	}
 }
 
 func (self *MoaClientManager) Destroy() {
