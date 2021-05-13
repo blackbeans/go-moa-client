@@ -241,8 +241,6 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
 	c, serviceMeta, err := self.clientManager.SelectClient(invokeCtx, serviceUri)
 	if nil != err {
-		// 负反馈，降低其优先级，，减少对其的调用，只有 优先级随机manager 真正实现
-		self.clientManager.NegativeFeedback(invokeCtx, serviceUri, serviceMeta)
 		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
 		return errFunc(err)
@@ -257,6 +255,8 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		self.options.Clusters[self.options.Client.RunMode].ProcessTimeout)
 
 	if nil != err {
+		// 负反馈，降低其优先级，，减少对其的调用，只有 优先级随机manager 真正实现
+		self.clientManager.NegativeFeedback(invokeCtx, serviceUri, serviceMeta)
 		//response error and close this connection
 		log.ErrorLog("moa_client", "MoaConsumer|Invoke|Fail|%v|%s#%s|%s|%d|%d|%+v", err,
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, cmd)
