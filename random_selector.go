@@ -44,3 +44,5 @@ func (self *RandomStrategy) Iterator(f func(idx int, node core.ServiceMeta)) {
 		f(i, n)
 	}
 }
+
+func (RandomStrategy) NegativeFeedback(core.ServiceMeta) {}

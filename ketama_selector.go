@@ -1,15 +1,19 @@
 package client
 
 import (
-	core "github.com/blackbeans/go-moa"
 	"sync"
+
+	core "github.com/blackbeans/go-moa"
 )
 
 type Strategy interface {
 	Select(key string) core.ServiceMeta
 	ReHash(nodes []core.ServiceMeta)
 	Iterator(f func(idx int, node core.ServiceMeta))
+	NegativeFeedback(core.ServiceMeta)
 }
+
+var _ Strategy = (*KetamaStrategy)(nil)
 
 type KetamaStrategy struct {
 	ketama *Ketama
@@ -46,3 +50,5 @@ func (self *KetamaStrategy) Iterator(f func(idx int, node core.ServiceMeta)) {
 		f(i, n)
 	}
 }
+
+func (KetamaStrategy) NegativeFeedback(core.ServiceMeta) {}

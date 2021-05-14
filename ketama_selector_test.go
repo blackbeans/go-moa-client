@@ -2,6 +2,7 @@ package client
 
 import (
 	"testing"
+	"time"
 
 	core "github.com/blackbeans/go-moa"
 )
@@ -97,5 +98,54 @@ func BenchmarkKetamaSelector(b *testing.B) {
 		if host.HostPort != "localhost:2182" {
 			b.Fail()
 		}
+	}
+}
+
+
+func TestKetamaPriorityRandomStrategy(t *testing.T) {
+	nodes := []core.ServiceMeta{
+		{HostPort: "localhost:2181"},
+		{HostPort: "localhost:2182"},
+		{HostPort: "localhost:2183"}}
+
+	strategy := NewPriorityRandomStrategy(nodes)
+
+
+	// 优先级测试 和 ReHash
+	nodes = []core.ServiceMeta{
+		{HostPort: "localhost:2187"},
+		{HostPort: "localhost:2188"},
+		{HostPort: "localhost:2189"}}
+	
+
+	strategy.ReHash(nodes)
+	host1 := strategy.Select("100777")
+	t.Log(host1)
+	// 降低优先级 到 0
+	for i := 0; i<100; i++ {
+		strategy.NegativeFeedback(host1)
+	}
+
+	// 10s 内能运行完
+	for i := 0; i< 1000; i++{
+		host2 := strategy.Select("100777")
+		if host2.HostPort == host1.HostPort {
+			t.Fatal(host1, host2)
+		}
+	}
+
+	// 等待 11s 其恢复 1点优先级
+	time.Sleep(11 * time.Second)
+	statistical := make(map[core.ServiceMeta]int)
+	// 1000 次总得至少中一次吧
+	for i := 0; i< 1000; i++{
+		host2 := strategy.Select("100777")
+		statistical[host2]++
+		if host2.HostPort == host1.HostPort {
+			t.Logf("命中，i：%d", i)
+		}
+	}
+	for k, v := range statistical{
+		t.Logf("%s: %d", k.HostPort, v)
 	}
 }
