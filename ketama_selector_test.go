@@ -136,11 +136,16 @@ func TestKetamaPriorityRandomStrategy(t *testing.T) {
 
 	// 等待 11s 其恢复 1点优先级
 	time.Sleep(11 * time.Second)
+	statistical := make(map[core.ServiceMeta]int)
 	// 1000 次总得至少中一次吧
 	for i := 0; i< 1000; i++{
 		host2 := strategy.Select("100777")
+		statistical[host2]++
 		if host2.HostPort == host1.HostPort {
 			t.Logf("命中，i：%d", i)
 		}
+	}
+	for k, v := range statistical{
+		t.Logf("%s: %d", k.HostPort, v)
 	}
 }
