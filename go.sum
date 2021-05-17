@@ -28,6 +28,8 @@ github.com/blackbeans/go-moa v0.0.0-20210302075116-9f5b6443d2ee h1:t/So6wFw3KWnn
 github.com/blackbeans/go-moa v0.0.0-20210302075116-9f5b6443d2ee/go.mod h1:ZdWbIynlLRMFg9DR7EpZi+kiUlWygqC+uE+KhUQaFAc=
 github.com/blackbeans/go-moa v0.0.0-20210517045035-cccbf5143d66 h1:Y8RGOalqKwY4PD1xhzwHsnayX+f73nslwaZxa6YftgY=
 github.com/blackbeans/go-moa v0.0.0-20210517045035-cccbf5143d66/go.mod h1:Nk6Sugi4AvrUkRzJyfCDNM7LX8m61NgK04V1yvgTJW8=
+github.com/blackbeans/go-moa v0.0.0-20210517081208-6ded2c595702 h1:bBtKsbvGQAkhAPB6yaSuXqrrfNT/jVq0UKSU3aiDv4E=
+github.com/blackbeans/go-moa v0.0.0-20210517081208-6ded2c595702/go.mod h1:HmtasIuYGOgHGPcpG+0Qmpxq72zZyn7PZlPno6XeiWY=
 github.com/blackbeans/go-zookeeper v0.0.0-20160315041820-e9ca0f2da2a7 h1:YxOhaefbO74E+e0XH6s+N3MNBRYHfuF+YN5VG7EncuQ=
 github.com/blackbeans/go-zookeeper v0.0.0-20160315041820-e9ca0f2da2a7/go.mod h1:MxVuTEjQSE8nnLyPVzYZKQhMTaZoVBxw2xnmd/awuGM=
 github.com/blackbeans/log4go v0.0.0-20171230160053-a20c293261cf h1:rUrC7sm66LCWxsP8NFxkDkRKRnDkH55Ya+2orrGxrSk=
@@ -43,6 +45,8 @@ github.com/blackbeans/turbo v0.0.0-20210219044503-73b92b907523 h1:0nnzDxAEK00DW/
 github.com/blackbeans/turbo v0.0.0-20210219044503-73b92b907523/go.mod h1:d8ZVF8h7ZBnUvQXUwRGlXLXJmNNyIWi8TNDxvzJ5CX4=
 github.com/blackbeans/turbo v0.0.0-20210302074909-ee56915aab8b h1:0UCCxSX8frBVnGI9RJnfBzkbbJhEuKrvmEFJDM+6cec=
 github.com/blackbeans/turbo v0.0.0-20210302074909-ee56915aab8b/go.mod h1:d8ZVF8h7ZBnUvQXUwRGlXLXJmNNyIWi8TNDxvzJ5CX4=
+github.com/blackbeans/turbo v0.0.0-20210517044026-be07a6b2630c h1:A2lm1i9HiohzQCX1c92ltaam043zxfr5erHYgo7BmE8=
+github.com/blackbeans/turbo v0.0.0-20210517044026-be07a6b2630c/go.mod h1:d8ZVF8h7ZBnUvQXUwRGlXLXJmNNyIWi8TNDxvzJ5CX4=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash/v2 v2.1.1 h1:6MnRN8NT7+YBpUIWxHtefFZOKTAPgGjpQSxqLNn0+qY=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
