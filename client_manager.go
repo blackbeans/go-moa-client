@@ -152,7 +152,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 	} else if self.op.Client.SelectorStrategy == core.STRATEGY_RANDOM {
 		self.onlineUri2Ips.Store(uri, NewRandomStrategy(onlineServices))
 		self.preUri2Ips.Store(uri, NewRandomStrategy(preServices))
-	} else if self.op.Client.SelectorStrategy == "priority_random" {
+	} else if self.op.Client.SelectorStrategy == core.STRATEGY_PRIORITY_RANDOM {
 		self.onlineUri2Ips.Store(uri, NewPriorityRandomStrategy(onlineServices))
 		self.preUri2Ips.Store(uri, NewPriorityRandomStrategy(preServices))
 	} else {
