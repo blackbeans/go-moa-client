@@ -13,7 +13,6 @@ type PriorityRandomStrategy struct {
 	nodes    []core.ServiceMeta
 	priority map[core.ServiceMeta]int // 优先级
 	length   int
-	random   *rand.Rand
 	sync.RWMutex
 }
 
@@ -23,11 +22,9 @@ func NewPriorityRandomStrategy(nodes []core.ServiceMeta) *PriorityRandomStrategy
 		p[s] = 100
 	}
 
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 	priorityRandomStrategy := &PriorityRandomStrategy{
 		nodes:    nodes,
 		priority: p,
-		random:   random,
 		length:   len(nodes),
 	}
 
@@ -76,7 +73,8 @@ func (self *PriorityRandomStrategy) Select(key string) core.ServiceMeta {
 	for _, v := range self.priority {
 		sum += v
 	}
-	n := self.random.Intn(sum)
+	rand.Seed(time.Now().UnixNano())
+	n := rand.Intn(sum)
 	for s, v := range self.priority {
 		n = n - v
 		if n < 0 {
@@ -84,7 +82,7 @@ func (self *PriorityRandomStrategy) Select(key string) core.ServiceMeta {
 		}
 	}
 
-	return self.nodes[self.random.Intn(self.length)]
+	return self.nodes[rand.Intn(self.length)]
 }
 
 func (self *PriorityRandomStrategy) Iterator(f func(idx int, node core.ServiceMeta)) {
@@ -108,5 +106,13 @@ func (self *PriorityRandomStrategy) NegativeFeedback(s core.ServiceMeta) {
 		self.priority[s] = 0
 		return
 	}
-	self.priority[s]--
+	p := self.priority[s]
+	switch {
+	case p > 50:
+		self.priority[s] = p / 2
+	case p > 20:
+		self.priority[s] = p - 2
+	default:
+		self.priority[s]--
+	}
 }
