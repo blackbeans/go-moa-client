@@ -95,11 +95,6 @@ func (self *PriorityRandomStrategy) Iterator(f func(idx int, node core.ServiceMe
 
 // NegativeFeedback 负反馈，调用发生错，减小其优先级
 func (self *PriorityRandomStrategy) NegativeFeedback(s core.ServiceMeta) {
-	if self.priority[s] <= 0 {
-		self.priority[s] = 0
-		return
-	}
-
 	self.Lock()
 	defer self.Unlock()
 	if self.priority[s] <= 0 {
