@@ -31,8 +31,10 @@ func NewMoaClientManager(ctx context.Context, option core.Option, uris []string)
 
 	cluster := option.Clusters[option.Client.RunMode]
 	var reg core.IRegistry
-	if strings.HasPrefix(cluster.Registry, core.SCHEMA_ZK) {
-		reg = core.NewZkRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEMA_ZK), uris, false)
+	if strings.HasPrefix(cluster.Registry, core.SCHEME_ZK) {
+		reg = core.NewZkRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEME_ZK), uris, false)
+	} else if strings.HasPrefix(cluster.Registry, core.SCHEME_FILE) {
+		reg = core.NewFileRegistry(strings.TrimPrefix(cluster.Registry, core.SCHEME_FILE), uris, false)
 	}
 
 	reconnect := turbo.NewReconnectManager(true,
@@ -109,7 +111,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 
 	for _, hp := range addHostport {
 		hostport := hp
-		newFuture := turbo.NewFutureTask(func(ctx context.Context) (interface{}, error) {
+		newFuture := turbo.NewFutureTask(self.ctx, func(ctx context.Context) (interface{}, error) {
 			connection, err := net.DialTimeout("tcp", hostport, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout*5)
 			if nil != err {
 				log4go.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hostport, err)
@@ -117,7 +119,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 			}
 			conn := connection.(*net.TCPConn)
 
-			c := turbo.NewTClient(self.ctx, conn, func() turbo.ICodec {
+			c := turbo.NewTClient(ctx, conn, func() turbo.ICodec {
 				return core.BinaryCodec{
 					MaxFrameLength: turbo.MAX_PACKET_BYTES,
 					SnappyCompress: self.snappy}
@@ -131,7 +133,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 		//避免重复创建，如果已经存在的不需要做任何事情，如果不存在那么就需要主动执行一次
 		_, loaded := self.addrToTClient.LoadOrStore(hostport, newFuture)
 		if !loaded {
-			newFuture.Run(self.ctx)
+			newFuture.Run()
 		}
 	}
 
@@ -166,7 +168,11 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 	self.onlineUri2Ips.Range(func(key, value interface{}) bool {
 		strategy := value.(Strategy)
 		strategy.Iterator(func(i int, node core.ServiceMeta) {
-			usingIps[node.HostPort] = true
+			hp := node.HostPort
+			if ipAddr, err := net.ResolveIPAddr("tcp", node.HostPort); nil != err {
+				hp = ipAddr.IP.String()
+			}
+			usingIps[hp] = true
 		})
 		return true
 	})
@@ -174,10 +180,17 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 	self.preUri2Ips.Range(func(key, value interface{}) bool {
 		strategy := value.(Strategy)
 		strategy.Iterator(func(i int, node core.ServiceMeta) {
-			usingIps[node.HostPort] = true
+			hp := node.HostPort
+			if ipAddr, err := net.ResolveIPAddr("tcp", node.HostPort); nil != err {
+				hp = ipAddr.IP.String()
+			}
+
+			usingIps[hp] = true
 		})
 		return true
 	})
+
+	log4go.InfoLog("config_center", "MoaClientManager|All Use Ips|SUCC|%v", usingIps)
 	for ip := range self.clientsManager.ClientsClone() {
 		_, ok := usingIps[ip]
 		if !ok {

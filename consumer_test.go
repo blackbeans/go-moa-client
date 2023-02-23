@@ -85,28 +85,34 @@ func (self UserServicePanic) GetTime(t time.Time) error {
 func initMoaServer() *core.Application {
 
 	uinter := (*IUserService)(nil)
-	return core.NewApplication("./benchmark/conf/moa.toml", func() []core.Service {
-		return []core.Service{
-			core.Service{
-				ServiceUri: "/service/user-service",
-				Instance:   UserServiceDemo{},
-				Interface:  uinter},
-			core.Service{
-				ServiceUri: "/service/user-service-panic",
-				Instance:   UserServicePanic{},
-				Interface:  uinter,
-				GroupId:    "s-mts-group"}}
-	})
+	return core.NewApplicationWithContext(context.Background(),
+		"./conf/moa.toml", func() []core.Service {
+			return []core.Service{
+				core.Service{
+					ServiceUri: "/service/user-service",
+					Instance:   UserServiceDemo{},
+					Interface:  uinter},
+				core.Service{
+					ServiceUri: "/service/user-service-panic",
+					Instance:   UserServicePanic{},
+					Interface:  uinter,
+					GroupId:    "s-mts-group"}}
+		}, func(serviceUri, host string, moainfo core.MoaInfo) {
+
+		})
 
 }
 
 func TestNoGroupMakeRpcFunc(t *testing.T) {
 	app := initMoaServer()
-	defer app.DestroyApplication()
+	defer func() {
+		app.DestroyApplication()
+		time.Sleep(10 * time.Second)
+	}()
 	//等待5s注册地址
 	time.Sleep(10 * time.Second)
 
-	consumer := NewMoaConsumer("./benchmark/conf/moa.toml",
+	consumer := NewMoaConsumer("./conf/moa.toml",
 		[]Service{
 			Service{
 				ServiceUri: "/service/user-service",
@@ -174,9 +180,12 @@ func TestClientChange(t *testing.T) {
 	}
 
 	app := initMoaServer()
-	defer app.DestroyApplication()
+	defer func() {
+		app.DestroyApplication()
+		time.Sleep(10 * time.Second)
+	}()
 	time.Sleep(10 * time.Second)
-	consumer := NewMoaConsumer("./benchmark/conf/moa.toml",
+	consumer := NewMoaConsumer("./conf/moa.toml",
 		[]Service{Service{
 			ServiceUri: "/service/user-service",
 			Interface:  &UserService{}}})
@@ -189,14 +198,16 @@ func TestClientChange(t *testing.T) {
 	fmt.Printf("/service/user-service----------%v\n", ips)
 	exist := false
 	ips.(Strategy).Iterator(func(idx int, hp core.ServiceMeta) {
-		if hp.HostPort == ipaddress+":13000" {
+		expectIp, _ := net.ResolveIPAddr("tcp", "localhost")
+		domain, port, _ := net.SplitHostPort(hp.HostPort)
+		ip, _ := net.ResolveIPAddr("tcp", domain)
+		if ip == expectIp && "13000" == port {
 			exist = true
 		}
 	})
 	if !exist {
-		t.Fail()
 		t.Logf("RegisteService|SUCC|But Client Not Get|%s", ipaddress+":13000")
-		return
+		t.FailNow()
 	}
 
 	t.Log("-----------Remove Node " + ipaddress + ":13000")
