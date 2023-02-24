@@ -1,7 +1,7 @@
 #### MOA Client使用方式
 
 * 安装：
-     安装ZooKeeper
+     安装ZooKeeper (或者使用本地文件指定连接特定Server)
         $Zookeeper/bin/zkServer.sh start
 
     ``` 

@@ -1,14 +1,13 @@
 package client
 
 import (
+	core "github.com/blackbeans/go-moa"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/blackbeans/go-moa"
-
-	log "github.com/blackbeans/log4go"
+	log "github.com/sirupsen/logrus"
 )
 
 type IAddressListener func(uri string, hosts []core.ServiceMeta)
@@ -63,7 +62,7 @@ func (self *AddressManager) loadAvailableAddress() map[string][]core.ServiceMeta
 			serviceUri, groupId := core.UnwrapServiceUri(uri)
 			addrs, err := self.registry.GetService(serviceUri, core.PROTOCOL, groupId)
 			if nil != err {
-				log.WarnLog("config_center", "AddressManager|loadAvailableAddress|FAIL|%s|%s", err, uri)
+				log.Warnf("AddressManager|loadAvailableAddress|FAIL|%s|%s", err, uri)
 				self.lock.RLock()
 				oldAddrs, ok := self.uri2Services[uri]
 				if ok {
@@ -111,8 +110,7 @@ func (self *AddressManager) loadAvailableAddress() map[string][]core.ServiceMeta
 
 					//变化通知
 					if needChange {
-						log.InfoLog("config_center",
-							"AddressManager|loadAvailableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
+						log.Infof("AddressManager|loadAvailableAddress|NeedChange|%s|old:%v|news:%v", uri, oldAddrs, addrs)
 						self.listener(uri, addrs)
 
 					}

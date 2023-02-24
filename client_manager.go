@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/blackbeans/log4go"
 
 	core "github.com/blackbeans/go-moa"
 	"github.com/blackbeans/turbo"
@@ -86,9 +85,9 @@ func (self *MoaClientManager) CheckAlive() {
 					p.PayLoad = pipo
 					err := server.Ping(p, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout)
 					if nil != err {
-						log4go.WarnLog("config_center", "CheckAlive|FAIL|%s|%v", ip, err)
+						log.Warnf("CheckAlive|FAIL|%s|%v", ip, err)
 					} else {
-						log4go.WarnLog("config_center", "CheckAlive|SUCC|%s...", ip)
+						log.Warnf("CheckAlive|SUCC|%s...", ip)
 					}
 				}()
 			}
@@ -98,7 +97,7 @@ func (self *MoaClientManager) CheckAlive() {
 }
 
 func (self *MoaClientManager) OnAddressChange(uri string, services []core.ServiceMeta) {
-	log4go.WarnLog("config_center", "OnAddressChange|%s|%s", uri, services)
+	log.Warnf("OnAddressChange|%s|%v", uri, services)
 	//新增地址
 	addHostport := make([]string, 0, 2)
 	//寻找新增连接
@@ -114,7 +113,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 		newFuture := turbo.NewFutureTask(self.ctx, func(ctx context.Context) (interface{}, error) {
 			connection, err := net.DialTimeout("tcp", hostport, self.op.Clusters[self.op.Client.RunMode].ProcessTimeout*5)
 			if nil != err {
-				log4go.ErrorLog("config_center", "MoaClientManager|Create Client|FAIL|%s|%v", hostport, err)
+				log.Errorf("MoaClientManager|Create Client|FAIL|%s|%v", hostport, err)
 				return nil, err
 			}
 			conn := connection.(*net.TCPConn)
@@ -125,7 +124,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 					SnappyCompress: self.snappy}
 			}, self.dis, self.config)
 			c.Start()
-			log4go.InfoLog("config_center", "MoaClientManager|Create Client|SUCC|%s", hostport)
+			log.Infof("MoaClientManager|Create Client|SUCC|%s", hostport)
 			self.clientsManager.Auth(turbo.NewGroupAuth(hostport, ""), c)
 			return c, nil
 		})
@@ -162,7 +161,7 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 		self.preUri2Ips.Store(uri, NewRandomStrategy(preServices))
 	}
 
-	log4go.InfoLog("config_center", "MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, services)
+	log.Infof("MoaClientManager|Store Uri Pool|SUCC|%s|%v", uri, services)
 	//清理掉不再使用client
 	usingIps := make(map[string]bool, 5)
 	self.onlineUri2Ips.Range(func(key, value interface{}) bool {
@@ -190,17 +189,17 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 		return true
 	})
 
-	log4go.InfoLog("config_center", "MoaClientManager|All Use Ips|SUCC|%v", usingIps)
+	log.Infof("MoaClientManager|All Use Ips|SUCC|%v", usingIps)
 	for ip := range self.clientsManager.ClientsClone() {
 		_, ok := usingIps[ip]
 		if !ok {
 			//不再使用了移除
 			self.addrToTClient.Delete(ip)
 			self.clientsManager.DeleteClients(ip)
-			log4go.InfoLog("config_center", "MoaClientManager|RemoveUnUse Client|SUCC|%s", ip)
+			log.Infof("MoaClientManager|RemoveUnUse Client|SUCC|%s", ip)
 		}
 	}
-	log4go.InfoLog("config_center", "MoaClientManager|OnAddressChange|SUCC|%s|Online:%v|Pre:%v", uri, onlineServices, preServices)
+	log.Infof("MoaClientManager|OnAddressChange|SUCC|%s|Online:%v|Pre:%v", uri, onlineServices, preServices)
 }
 
 //根据Uri获取连接

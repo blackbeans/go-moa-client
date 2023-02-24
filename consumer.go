@@ -12,8 +12,8 @@ import (
 	"time"
 
 	core "github.com/blackbeans/go-moa"
-	log "github.com/blackbeans/log4go"
 	"github.com/blackbeans/turbo"
+	log "github.com/sirupsen/logrus"
 )
 
 type Service struct {
@@ -153,7 +153,7 @@ func (self *MoaConsumer) makeRpcFunc(s core.Service) {
 			self.proxyMethod(s, htype, i, method)
 		}
 	}
-	log.InfoLog("moa_client", "MoaConsumer|Proxy|SUCC|%s->%s", s.ServiceUri, s.GroupId)
+	log.Infof("MoaConsumer|Proxy|SUCC|%s->%s", s.ServiceUri, s.GroupId)
 }
 
 //动态代理调用方法
@@ -241,7 +241,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	serviceUri := BuildServiceUri(s.ServiceUri, s.GroupId)
 	c, serviceMeta, err := self.clientManager.SelectClient(invokeCtx, serviceUri)
 	if nil != err {
-		log.ErrorLog("moa_client", "MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
+		log.Errorf("MoaConsumer|rpcInvoke|SelectClient|FAIL|%s|%s",
 			err, serviceUri)
 		return errFunc(err)
 
@@ -258,7 +258,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		// 负反馈，降低其优先级，，减少对其的调用，只有 优先级随机manager 真正实现
 		self.clientManager.NegativeFeedback(invokeCtx, serviceUri, serviceMeta)
 		//response error and close this connection
-		log.ErrorLog("moa_client", "MoaConsumer|Invoke|Fail|%v|%s#%s|%s|%d|%d|%+v", err,
+		log.Errorf("MoaConsumer|Invoke|Fail|%v|%s#%s|%s|%d|%d|%+v", err,
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, cmd)
 
 		return errFunc(err)
@@ -270,7 +270,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 	if rpcCost >= 1000 && *self.options.Client.SlowLog {
 		// 超时负反馈，降低其优先级，减少对其的调用，只有 优先级随机manager 真正实现
 		self.clientManager.NegativeFeedback(invokeCtx, serviceUri, serviceMeta)
-		log.WarnLog("moa_client", "MoaConsumer|Invoke|SLOW|%s#%s|%s|TimeMs[%d->%d->%d]",
+		log.Warnf("MoaConsumer|Invoke|SLOW|%s#%s|%s|TimeMs[%d->%d->%d]",
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost)
 	}
 
@@ -309,7 +309,7 @@ func (self *MoaConsumer) rpcInvoke(s core.Service, method string,
 		}
 	} else {
 		//invoke Fail
-		log.ErrorLog("moa_client",
+		log.Errorf(
 			"MoaConsumer|Invoke|RPCFAIL|%s#%s|%s|TimeMs[%d->%d->%d]|%+v",
 			cmd.ServiceUri, c.RemoteAddr(), cmd.Params.Method, wrapCost, selectCost, rpcCost, resp)
 		err = errors.New(resp.Message)

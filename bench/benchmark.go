@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/blackbeans/go-moa"
 	"github.com/blackbeans/go-moa-client"
@@ -35,12 +36,14 @@ func main() {
 
 	if *server {
 
-		app := core.NewApplication("conf/moa.toml", func() []core.Service {
+		app := core.NewApplicationWithContext(context.TODO(), "./conf/moa.toml", func() []core.Service {
 			return []core.Service{
 				core.Service{
-					ServiceUri: "/service/go-moa",
+					ServiceUri: "/service/user-service",
 					Instance:   GoMoaDemo{},
 					Interface:  (*IGoMoaDemo)(nil)}}
+		}, func(serviceUri, host string, moainfo core.MoaInfo) {
+
 		})
 
 		//设置
@@ -58,11 +61,11 @@ func main() {
 func startClient() {
 	consumer := client.NewMoaConsumer("./conf/moa.toml",
 		[]client.Service{client.Service{
-			ServiceUri: "/service/go-moa",
+			ServiceUri: "/service/user-service",
 			Interface:  &GoMoaDemoProxy{}}})
 
 	for {
-		s, _ := consumer.GetService("/service/go-moa")
+		s, _ := consumer.GetService("/service/user-service")
 		h := s.(*GoMoaDemoProxy)
 		err := h.SetName("a")
 		if nil != err {

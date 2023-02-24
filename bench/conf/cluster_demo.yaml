@@ -1,0 +1,16 @@
+#集群配置
+clusters:
+  - service_uri: "/service/user-service"
+    gid: ""
+    proto_ver: ""
+    isPre: false
+    hostports:
+      - "127.0.0.1:13000"
+
+
+  - service_uri: "/service/user-service-panic"
+    gid: "s-mts-group"
+    proto_ver: ""
+    isPre: false
+    hostports:
+      - "localhost:13000"
