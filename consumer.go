@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/blackbeans/logx"
 	"reflect"
 	"strings"
 	"sync"
@@ -13,7 +14,6 @@ import (
 
 	core "github.com/blackbeans/go-moa"
 	"github.com/blackbeans/turbo"
-	log "github.com/sirupsen/logrus"
 )
 
 type Service struct {
@@ -32,8 +32,11 @@ type MoaConsumer struct {
 	buffPool      *sync.Pool
 }
 
+var log = logx.GetLogger("moa-client")
+
 func NewMoaConsumer(confPath string, ps []Service) *MoaConsumer {
 
+	log = logx.GetLogger("moa-client")
 	options, err := core.LoadConfiguration(confPath)
 	if nil != err {
 		panic(err)

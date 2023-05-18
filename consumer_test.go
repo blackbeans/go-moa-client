@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/blackbeans/logx"
 	"net"
 	"testing"
 	"time"
@@ -104,6 +105,7 @@ func initMoaServer() *core.Application {
 }
 
 func TestNoGroupMakeRpcFunc(t *testing.T) {
+	logx.InitLogger("./logs", "./conf/log.xml")
 	app := initMoaServer()
 	defer func() {
 		app.DestroyApplication()

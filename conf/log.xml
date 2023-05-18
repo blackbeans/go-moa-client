@@ -12,7 +12,7 @@
     <level>INFO</level>
   </filter>
   <filter enabled="true">
-    <tag>moa_server</tag>
+    <tag>moa-server</tag>
     <type>file</type>
     <level>INFO</level>
     <property name="filename">./logs/moa_server.log</property>
@@ -45,9 +45,9 @@
     <property name="daily">true</property> <!-- Automatically rotates when a log message is written after midnight -->
   </filter>
    <filter enabled="true">
-    <tag>moa_client</tag>
+    <tag>moa-client</tag>
     <type>file</type>
-    <level>WARNING</level>
+    <level>INFO</level>
     <property name="filename">./logs/moa_client.log</property>
     <property name="format">[%D %T] [%L] %M</property>
     <property name="rotate">true</property>

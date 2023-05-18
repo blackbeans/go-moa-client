@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type IAddressListener func(uri string, hosts []core.ServiceMeta)
