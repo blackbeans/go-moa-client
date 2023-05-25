@@ -9,6 +9,5 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gops v0.3.27 // indirect
 	github.com/prometheus/common v0.43.0 // indirect
-	github.com/sirupsen/logrus v1.9.2 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 )
