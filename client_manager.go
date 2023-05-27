@@ -167,8 +167,9 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 		strategy := value.(Strategy)
 		strategy.Iterator(func(i int, node core.ServiceMeta) {
 			hp := node.HostPort
-			if ipAddr, err := net.ResolveIPAddr("tcp", node.HostPort); nil != err {
-				hp = ipAddr.IP.String()
+			ip, port, _ := net.SplitHostPort(hp)
+			if ipAddr, err := net.ResolveIPAddr("", ip); err == nil {
+				hp = net.JoinHostPort(ipAddr.IP.String(), port)
 			}
 			usingIps[hp] = true
 		})
@@ -179,10 +180,10 @@ func (self *MoaClientManager) OnAddressChange(uri string, services []core.Servic
 		strategy := value.(Strategy)
 		strategy.Iterator(func(i int, node core.ServiceMeta) {
 			hp := node.HostPort
-			if ipAddr, err := net.ResolveIPAddr("tcp", node.HostPort); nil != err {
-				hp = ipAddr.IP.String()
+			ip, port, _ := net.SplitHostPort(hp)
+			if ipAddr, err := net.ResolveIPAddr("", ip); err == nil {
+				hp = net.JoinHostPort(ipAddr.IP.String(), port)
 			}
-
 			usingIps[hp] = true
 		})
 		return true
